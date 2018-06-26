@@ -1,0 +1,3 @@
+APP_SRC +=  ex06_nvram.c
+
+C_FLAGS += -DWICED_BT_TRACE_ENABLE
