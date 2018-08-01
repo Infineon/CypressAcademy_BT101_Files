@@ -8,7 +8,7 @@
 
 #include "wiced_bt_uuid.h"
 #include "wiced_bt_gatt.h"
-#include "ex01_key_LED_db.h"
+#include "key_LED_db.h"
 
 /*************************************************************************************
 ** GATT server definitions
