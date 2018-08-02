@@ -297,6 +297,9 @@ wiced_bt_dev_status_t ex04_ble_bond_management_callback( wiced_bt_management_evt
     wiced_bt_dev_ble_pairing_info_t *p_ble_info = NULL;
     wiced_bt_ble_advert_mode_t *p_adv_mode = NULL;
 
+    uint8_t counter;
+    uint8_t bytes;
+
     WICED_BT_TRACE("*********************** BLE Stack Management Callback Event: %d ***********************\n", event );
 
     switch (event)
@@ -392,20 +395,40 @@ wiced_bt_dev_status_t ex04_ble_bond_management_callback( wiced_bt_management_evt
         WICED_BT_TRACE("Paired Device Link Request Keys Event\n");
         /* Device/app-specific TODO: HANDLE PAIRED DEVICE LINK REQUEST KEY - retrieve from NVRAM, etc */
         /* read keys from NVRAM */
-         wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS, sizeof(wiced_bt_device_link_keys_t), (uint8_t *) &(p_event_data->paired_device_link_keys_request), &status );
-         WICED_BT_TRACE("\tKeys read from NVRAM %B result: %d \n\r", &(p_event_data->paired_device_link_keys_request), status);
+        /* If the status from read_nvram is not SUCCESS, the stack will generate keys and will then call BTM_PAIRED_DEVICE_LINK_KEYS_UPDATE_EVT so that they can be stored */
+        wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS, sizeof(wiced_bt_device_link_keys_t), (uint8_t *) &(p_event_data->paired_device_link_keys_request), &status );
+        WICED_BT_TRACE("\tKeys read from NVRAM %B result: %d \n\r", &(p_event_data->paired_device_link_keys_request), status);
         break;
-    case BTM_LOCAL_IDENTITY_KEYS_UPDATE_EVT: /* Update of local keys - save to NVSRAM */
+    case BTM_LOCAL_IDENTITY_KEYS_UPDATE_EVT: /* Update of local privacy keys - save to NVSRAM */
             WICED_BT_TRACE( "Local Identity Key Update\n\r");
-            wiced_hal_write_nvram ( WICED_NVRAM_LOCAL_KEYS, sizeof( wiced_bt_local_identity_keys_t ), (uint8_t*)&(p_event_data->local_identity_keys_update), &status );
+            bytes = wiced_hal_write_nvram ( WICED_NVRAM_LOCAL_KEYS, sizeof( wiced_bt_local_identity_keys_t ), (uint8_t*)&(p_event_data->local_identity_keys_update), &status );
             /* Result is the number of bytes written */
-            WICED_BT_TRACE("\tlocal keys save to NVRAM result: %d \n\r", status);
+            WICED_BT_TRACE("\tlocal keys save to NVRAM:\n\r");
+            for(counter = 0; counter<bytes;counter++)
+            {
+                WICED_BT_TRACE("%02X ", p_event_data->local_identity_keys_update.local_key_data[counter]);
+                if(counter % 16 == 0)
+                {
+                    WICED_BT_TRACE("\n\r");
+                }
+            }
+            WICED_BT_TRACE("result: %d \n\r", status);
             break;
-    case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT: /* Request for local keys - read from NVSRAM */
+    case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT: /* Request for local privacy keys - read from NVSRAM */
         WICED_BT_TRACE( "Local Identity Key Request\n\r");
-        wiced_hal_read_nvram( WICED_NVRAM_LOCAL_KEYS, sizeof(wiced_bt_local_identity_keys_t), (uint8_t *)&(p_event_data->local_identity_keys_request), &status );
+        /* If the status from read_nvram is not SUCCESS, the stack will generate keys and will then call BTM_LOCAL_IDENTITY_KEYS_UPDATE_EVT so that they can be stored */
+        bytes = wiced_hal_read_nvram( WICED_NVRAM_LOCAL_KEYS, sizeof(wiced_bt_local_identity_keys_t), (uint8_t *)&(p_event_data->local_identity_keys_request), &status );
         /* Result is the number of bytes read */
-        WICED_BT_TRACE("\tlocal keys read from NVRAM result: %d Key: %B\n\r",  status, (uint8_t *)&(p_event_data->local_identity_keys_request));
+        WICED_BT_TRACE("\tlocal keys read from NVRAM:\n\r");
+        for(counter = 0; counter<bytes;counter++)
+        {
+            WICED_BT_TRACE("%02X ", p_event_data->local_identity_keys_request.local_key_data[counter]);
+            if(counter % 16 == 0)
+            {
+                WICED_BT_TRACE("\n\r");
+            }
+        }
+        WICED_BT_TRACE("result: %d \n\r", status);
         break;
     case BTM_BLE_ADVERT_STATE_CHANGED_EVT:
         /* Advertisement State Changed */
@@ -816,10 +839,8 @@ void button_cback( void *data, uint8_t port_pin )
     /* Remove bonding information from NVRAM */
     memset( &hostinfo, 0, sizeof(hostinfo));
     memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
-    memset( &local_keys, 0, sizeof(wiced_bt_local_identity_keys_t));
     wiced_hal_write_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
     wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS, sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
-    wiced_hal_write_nvram ( WICED_NVRAM_LOCAL_KEYS, sizeof( wiced_bt_local_identity_keys_t ), (uint8_t*)&local_keys, &result );
 
     /* Clear the GPIO interrupt */
     wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
