@@ -59,7 +59,7 @@ const wiced_platform_led_config_t platform_led[] =
         [WICED_PLATFORM_LED_1] =
             {
                 .gpio          = (wiced_bt_gpio_numbers_t*)&platform_gpio_pins[PLATFORM_GPIO_10].gpio_pin,
-                .config        = ( GPIO_OUTPUT_ENABLE ),
+                .config        = ( GPIO_OUTPUT_ENABLE),
                 .default_state = GPIO_PIN_OUTPUT_LOW,
             },
 
@@ -69,7 +69,7 @@ const wiced_platform_led_config_t platform_led[] =
         [WICED_PLATFORM_LED_2] =
             {
                 .gpio          = (wiced_bt_gpio_numbers_t*)&platform_gpio_pins[PLATFORM_GPIO_11].gpio_pin,
-                .config        = ( GPIO_OUTPUT_ENABLE ),
+                .config        = ( GPIO_OUTPUT_ENABLE),
                 .default_state = GPIO_PIN_OUTPUT_LOW,
             }
     };

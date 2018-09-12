@@ -167,3 +167,5 @@ wiced_platform_gpio_config_t;
 
 /* utility functions */
 void wiced_platform_register_button_callback(wiced_platform_button_number_t button, void (*userfn)(void*, UINT8), void* userdata, wiced_platform_button_interrupt_edge_t trigger_edge);
+void wiced_platform_init(void);
+uint32_t wiced_platform_get_button_pressed_value(wiced_platform_button_number_t button);

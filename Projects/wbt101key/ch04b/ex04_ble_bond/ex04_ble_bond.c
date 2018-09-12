@@ -134,7 +134,7 @@ uint8_t ex04_ble_bond_capsense_buttons_cccd[]      = {0x00,0x00};
 gatt_db_lookup_table ex04_ble_bond_gatt_db_ext_attr_tbl[] =
 {
     /* { attribute handle,                       maxlen, curlen, attribute data } */
-    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      12,     12,     ex04_ble_bond_generic_access_device_name},
+    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      8,      8,     ex04_ble_bond_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,       2,      2,      ex04_ble_bond_generic_access_appearance},
     {HDLC_CAPSENSE_BUTTONS_VALUE,                3,      3,      ex04_ble_bond_capsense_buttons},
     {HDLD_CAPSENSE_BUTTONS_CLIENT_CONFIGURATION, 2,      2,      ex04_ble_bond_capsense_buttons_cccd},
@@ -392,7 +392,7 @@ wiced_bt_dev_status_t ex04_ble_bond_management_callback( wiced_bt_management_evt
         break;
     case BTM_PAIRED_DEVICE_LINK_KEYS_REQUEST_EVT:
         /* Paired Device Link Keys Request */
-        WICED_BT_TRACE("Paired Device Link Request Keys Event\n");
+        WICED_BT_TRACE("Paired Device Link Request Keys Event for device %B\n",&(p_event_data->paired_device_link_keys_request));
         /* Device/app-specific TODO: HANDLE PAIRED DEVICE LINK REQUEST KEY - retrieve from NVRAM, etc */
         /* read keys from NVRAM */
         /* If the status from read_nvram is not SUCCESS, the stack will generate keys and will then call BTM_PAIRED_DEVICE_LINK_KEYS_UPDATE_EVT so that they can be stored */
