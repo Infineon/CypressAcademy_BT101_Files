@@ -142,7 +142,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
     /* LE Address Resolution Database Settings */
     .addr_resolution_db_size =              10,                                                         /**< LE Address Resolution Database Size - Effective only for pre-4.2 controller */
     .max_number_of_buffer_pools =           4,                                                          /**< Maximum number of buffer pools in p_btm_cfg_buf_pools and by wiced_create_pool */
-    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,           /**< Interval of random address refreshing - secs */
+    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,         /**< Interval of random address refreshing - secs */
 };
 
 /*******************************************************************

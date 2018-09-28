@@ -17,25 +17,32 @@
 #include "wiced_hal_gpio.h"
 #include "wiced_bt_app_hal_common.h"
 #include "wiced_hal_platform.h"
+#include "wiced_hal_wdog.h"
 #include "wiced_bt_trace.h"
+#include "wiced_bt_stack.h"
+#include "wiced_bt_sdp.h"
+#include "wiced_bt_app_common.h"
 #include "sparcommon.h"
+#include "string.h"
 #include "hci_control_api.h"
 #include "wiced_transport.h"
 #include "wiced_hal_pspi.h"
 #include "ex04_ble_con_db.h"
 #include "wiced_bt_cfg.h"
-#include "wiced_bt_stack.h"
-#include "wiced_bt_app_common.h"
-#include "wiced_hal_wdog.h"
 #include "wiced_rtos.h"
 #include "wiced_hal_i2c.h"
-
+#include "wiced_timer.h"
 
 /*******************************************************************
  * Constant Definitions
  ******************************************************************/
 #define TRANS_UART_BUFFER_SIZE  1024
 #define TRANS_UART_BUFFER_COUNT 2
+
+#define BLINK_RATE (500)
+
+#define LED_ON  (1)
+#define LED_OFF (0)
 
 /* Useful macros for thread priorities */
 #define PRIORITY_HIGH               (3)
@@ -52,6 +59,10 @@ extern const wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF_POOLS];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
+
+wiced_timer_t ledBlinkTimer;
+uint16_t connection_id = 0;
+
 wiced_thread_t * i2c_thread;
 
 /*******************************************************************
@@ -72,6 +83,8 @@ static uint32_t               hci_control_process_rx_cmd          ( uint8_t* p_d
 #ifdef HCI_TRACE_OVER_TRANSPORT
 static void                   ex04_ble_con_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
 #endif
+
+void ledBlinkCallback(uint32_t arg);
 void i2c_read( uint32_t arg );
 
 /*******************************************************************
@@ -105,7 +118,8 @@ wiced_transport_cfg_t transport_cfg =
  ******************************************************************/
 uint8_t ex04_ble_con_generic_access_device_name[] = {'k','e','y','_','c','o','n'};
 uint8_t ex04_ble_con_generic_access_appearance[]  = {0x00,0x00};
-uint8_t ex04_ble_con_capsense_buttons[]           = {0x04,0x00,0x00};
+uint8_t ex04_ble_con_wiced101_led[]               = {0x00};
+uint8_t ex04_ble_con_wiced101_buttons[]           = {0x04,0x00,0x00};
 
 /*******************************************************************
  * GATT Lookup Table
@@ -116,9 +130,10 @@ uint8_t ex04_ble_con_capsense_buttons[]           = {0x04,0x00,0x00};
 gatt_db_lookup_table ex04_ble_con_gatt_db_ext_attr_tbl[] =
 {
     /* { attribute handle,                  maxlen, curlen, attribute data } */
-    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE, 7,      7,     ex04_ble_con_generic_access_device_name},
+    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE, 12,     12,     ex04_ble_con_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,  2,      2,      ex04_ble_con_generic_access_appearance},
-    {HDLC_CAPSENSE_BUTTONS_VALUE,           3,      3,      ex04_ble_con_capsense_buttons},
+    {HDLC_WICED101_LED_VALUE,               1,      1,      ex04_ble_con_wiced101_led},
+    {HDLC_WICED101_BUTTONS_VALUE,           3,      3,      ex04_ble_con_wiced101_buttons},
 };
 
 // Number of Lookup Table Entries
@@ -175,7 +190,7 @@ void ex04_ble_con_app_init(void)
             NULL );                         // Function argument
 
     /* Allow peer to pair */
-    //wiced_bt_set_pairable_mode(WICED_TRUE, 0);
+    wiced_bt_set_pairable_mode(WICED_FALSE, 0);
 
     /* Set Advertisement Data */
     ex04_ble_con_set_advertisement_data();
@@ -185,6 +200,10 @@ void ex04_ble_con_app_init(void)
 
     /* Initialize GATT Database */
     wiced_bt_gatt_db_init( gatt_database, gatt_database_len );
+
+    /* Initialize timer that will blink LED during advertising */
+    wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
+    wiced_start_timer(&ledBlinkTimer, BLINK_RATE);
 
     /* Start Undirected LE Advertisements on device startup.
      * The corresponding parameters are contained in 'wiced_bt_cfg.c' */
@@ -198,7 +217,7 @@ void ex04_ble_con_set_advertisement_data( void )
     wiced_bt_ble_advert_elem_t adv_elem[3] = { 0 };
     uint8_t adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
     uint8_t num_elem = 0; 
-    uint8_t capsense_service_uuid[LEN_UUID_128] = { __UUID_CAPSENSE };
+    uint8_t capsense_service_uuid[LEN_UUID_128] = { __UUID_WICED101 };
 
     /* Advertisement Element for Flags */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_FLAG;
@@ -213,7 +232,7 @@ void ex04_ble_con_set_advertisement_data( void )
     num_elem++;
 
     /* Advertisement Element for CapSense Service */
-    adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_128SERVICE_DATA;
+    adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE;
     adv_elem[num_elem].len = LEN_UUID_128;
     adv_elem[num_elem].p_data = capsense_service_uuid;
     num_elem++;
@@ -228,6 +247,14 @@ void ex04_ble_con_advertisement_stopped( void )
     WICED_BT_TRACE("Advertisement stopped\n");
 
     /* TODO: Handle when advertisements stop */
+    if(0 == connection_id) /* Not connected */
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_OFF);
+    }
+    else
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_ON);
+    }
 }
 
 /* TODO: This function should be called when the device needs to be reset */
@@ -369,7 +396,9 @@ wiced_bt_gatt_status_t ex04_ble_con_get_value( uint16_t attr_handle, uint16_t co
                     break;
                 case HDLC_GENERIC_ACCESS_APPEARANCE_VALUE:
                     break;
-                case HDLC_CAPSENSE_BUTTONS_VALUE:
+                case HDLC_WICED101_LED_VALUE:
+                    break;
+                case HDLC_WICED101_BUTTONS_VALUE:
                     break;
                 }
             }
@@ -427,6 +456,14 @@ wiced_bt_gatt_status_t ex04_ble_con_set_value( uint16_t attr_handle, uint16_t co
 
                 // TODO: Add code for any action required when this attribute is written
                 // For example you may need to write the value into NVRAM if it needs to be persistent
+                switch ( attr_handle )
+                {
+                case HDLC_WICED101_LED_VALUE:
+                    /* Turn the LED on/off depending on the value written to the GATT database */
+                    WICED_BT_TRACE("Output = %d\n", ex04_ble_con_wiced101_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ex04_ble_con_wiced101_led[0]);
+                    break;
+                }
             }
             else
             {
@@ -491,6 +528,7 @@ wiced_bt_gatt_status_t ex04_ble_con_connect_callback( wiced_bt_gatt_connection_s
             WICED_BT_TRACE("Connected : BDA '%B', Connection ID '%d'\n", p_conn_status->bd_addr, p_conn_status->conn_id );
 
             /* TODO: Handle the connection */
+            connection_id = p_conn_status->conn_id;
         }
         else
         {
@@ -498,6 +536,7 @@ wiced_bt_gatt_status_t ex04_ble_con_connect_callback( wiced_bt_gatt_connection_s
             WICED_BT_TRACE("Disconnected : BDA '%B', Connection ID '%d', Reason '%d'\n", p_conn_status->bd_addr, p_conn_status->conn_id, p_conn_status->reason );
 
             /* TODO: Handle the disconnection */
+            connection_id = 0;
 
             /* restart the advertisements */
             wiced_bt_start_advertisements(BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL);
@@ -603,6 +642,14 @@ void ex04_ble_con_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t lengt
 }
 #endif
 
+/* Invert LED state when the timer expires if we are advertising to cause the LED to blink */
+void ledBlinkCallback(uint32_t arg)
+{
+    if(0 != wiced_bt_ble_get_current_advert_mode()) /* Advertising */
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, !wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ));
+    }
+}
 
 /* Thread function to read button values from PSoC */
 void i2c_read( uint32_t arg )
@@ -636,7 +683,7 @@ void i2c_read( uint32_t arg )
         if(prevVal != buttonVal) /* Only print if value has changed since last time */
         {
             WICED_BT_TRACE( "Button State: %02X\n\r", buttonVal);
-            ex04_ble_con_capsense_buttons[2] = buttonVal;
+            ex04_ble_con_wiced101_buttons[2] = buttonVal;
         }
         prevVal = buttonVal;
 

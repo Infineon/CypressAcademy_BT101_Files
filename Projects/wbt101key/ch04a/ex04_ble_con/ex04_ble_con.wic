@@ -98,9 +98,32 @@
         </Characteristic>
     </Service>
     <Service predefined="false" primary="true">
-        <Name>CapSense</Name>
+        <Name>Wiced101</Name>
         <Uuid>31 01 9B 5F 80 00 00 80 00 10 00 00 B5 CA 03 00</Uuid>
-        <Description>Vendor Specific Service: CapSense</Description>
+        <Description>Vendor Specific Service: Wiced101</Description>
+        <Characteristic mandatory="false" predefined="false">
+            <Name>LED</Name>
+            <Uuid>cf 0a 40 04 41 42 40 70 ad 61 e1 ce c0 08 2b 41</Uuid>
+            <Description>Vendor Specific Characteristic: LED</Description>
+            <DataType/>
+            <Size>1</Size>
+            <InitialValue/>
+            <Properties>
+                <Read>true</Read>
+                <Notify>false</Notify>
+                <Indicate>false</Indicate>
+                <Write>true</Write>
+            </Properties>
+            <Permissions>
+                <VariableLength>false</VariableLength>
+                <Read>true</Read>
+                <Write>true</Write>
+                <WriteWithoutResponse>false</WriteWithoutResponse>
+                <AuthenticatedRead>false</AuthenticatedRead>
+                <ReliableWrite>false</ReliableWrite>
+                <AuthenticatedWrite>false</AuthenticatedWrite>
+            </Permissions>
+        </Characteristic>
         <Characteristic mandatory="false" predefined="false">
             <Name>Buttons</Name>
             <Uuid>31 01 9B 5F 80 00 00 80 00 10 00 00 A3 CA 03 00</Uuid>

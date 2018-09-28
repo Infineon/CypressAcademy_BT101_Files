@@ -42,6 +42,12 @@
 #define TRANS_UART_BUFFER_SIZE  1024
 #define TRANS_UART_BUFFER_COUNT 2
 
+#define BONDED_BLINK_RATE  (100)
+#define BONDING_BLINK_RATE (500)
+
+#define LED_ON  (1)
+#define LED_OFF (0)
+
 /* Useful macros for thread priorities */
 #define PRIORITY_HIGH               (3)
 #define PRIORITY_MEDIUM             (5)
@@ -51,7 +57,7 @@
 #define THREAD_STACK_MIN_SIZE       (500)
 
 /* Max number of bonded devices */
-#define BOND_MAX    2
+#define BOND_MAX    4
 /* NVSRAM locations available for application data - NVSRAM Volatile Section Identifier */
 /* WICED_NVRAM_LOCAL_KEYS holds the privacy keys */
 /* WICED_NVRAM_BOND_INFO stores the number of bonded devices and the next one to be over-written when space is full */
@@ -69,9 +75,10 @@ extern const wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF_POOLS];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
-wiced_thread_t * i2c_thread;
-wiced_thread_t * led_thread;
 
+wiced_thread_t * i2c_thread;
+
+wiced_timer_t ledBlinkTimer;
 uint16_t connection_id = 0;
 uint8_t bondIndex = 0;      /* This is the index for the VSID for the host we are currently bonded to */
 uint8_t bondInfo[] = {0,0}; /* This holds bonding info (number bonded and next free slot) */
@@ -109,8 +116,9 @@ static uint32_t               hci_control_process_rx_cmd          ( uint8_t* p_d
 #ifdef HCI_TRACE_OVER_TRANSPORT
 static void                   ex07_ble_multi_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
 #endif
+
+void ledBlinkCallback(uint32_t arg);
 void i2c_read( uint32_t arg );
-void bonding_led( uint32_t arg );   // Thread to blink LED when in bonding mode
 void button_cback1( void *data, uint8_t port_pin );  // Button ISR to enter bonding mode
 void button_cback2( void *data, uint8_t port_pin );  // Button ISR to enter bonding mode
 
@@ -145,8 +153,9 @@ wiced_transport_cfg_t transport_cfg =
  ******************************************************************/
 uint8_t ex07_ble_multi_generic_access_device_name[] = {'k','e','y','_','m','u','l','t'};
 uint8_t ex07_ble_multi_generic_access_appearance[]  = {0x00,0x00};
-uint8_t ex07_ble_multi_capsense_buttons[]           = {0x04,0x00,0x00};
-uint8_t ex07_ble_multi_capsense_buttons_cccd[]      = {0x00,0x00};
+uint8_t ex07_ble_multi_wiced101_led[]               = {0x00};
+uint8_t ex07_ble_multi_wiced101_buttons[]           = {0x04,0x00,0x00};
+uint8_t ex07_ble_multi_wiced101_buttons_cccd[]      = {0x00,0x00};
 
 /*******************************************************************
  * GATT Lookup Table
@@ -157,10 +166,11 @@ uint8_t ex07_ble_multi_capsense_buttons_cccd[]      = {0x00,0x00};
 gatt_db_lookup_table ex07_ble_multi_gatt_db_ext_attr_tbl[] =
 {
     /* { attribute handle,                       maxlen, curlen, attribute data } */
-    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      12,     12,     ex07_ble_multi_generic_access_device_name},
+    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      8,      8,      ex07_ble_multi_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,       2,      2,      ex07_ble_multi_generic_access_appearance},
-    {HDLC_CAPSENSE_BUTTONS_VALUE,                3,      3,      ex07_ble_multi_capsense_buttons},
-    {HDLD_CAPSENSE_BUTTONS_CLIENT_CONFIGURATION, 2,      2,      ex07_ble_multi_capsense_buttons_cccd},
+    {HDLC_WICED101_LED_VALUE,                    1,      1,      ex07_ble_multi_wiced101_led},
+    {HDLC_WICED101_BUTTONS_VALUE,                3,      3,      ex07_ble_multi_wiced101_buttons},
+    {HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION, 2,      2,      ex07_ble_multi_wiced101_buttons_cccd},
 };
 
 // Number of Lookup Table Entries
@@ -230,16 +240,6 @@ void ex07_ble_multi_app_init(void)
              THREAD_STACK_MIN_SIZE,          // Stack
              NULL );                         // Function argument
 
-     /* Start a thread to blink LED if we are in bonding mode */
-      led_thread = wiced_rtos_create_thread();       // Get memory for the thread handle
-      wiced_rtos_init_thread(
-              led_thread,                     // Thread handle
-              PRIORITY_MEDIUM,                // Priority
-              "LED",                          // Name
-              bonding_led,                    // Function
-              THREAD_STACK_MIN_SIZE,          // Stack
-              NULL );                         // Function argument
-
     /* Allow peer to pair */
     wiced_bt_set_pairable_mode(WICED_TRUE, 0);
 
@@ -272,6 +272,10 @@ void ex07_ble_multi_app_init(void)
     /* Initialize GATT Database */
     wiced_bt_gatt_db_init( gatt_database, gatt_database_len );
 
+    /* Initialize timer that will blink LED during advertising - speed depends on if we are bonded or not */
+    wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
+    wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
+
     /* Start Undirected LE Advertisements on device startup.
      * The corresponding parameters are contained in 'wiced_bt_cfg.c' */
     wiced_bt_start_advertisements(BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL);
@@ -283,7 +287,7 @@ void ex07_ble_multi_set_advertisement_data( void )
     wiced_bt_ble_advert_elem_t adv_elem[3] = { 0 };
     uint8_t adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
     uint8_t num_elem = 0; 
-    uint8_t capsense_service_uuid[LEN_UUID_128] = { __UUID_CAPSENSE };
+    uint8_t wiced101_service_uuid[LEN_UUID_128] = { __UUID_WICED101 };
 
     /* Advertisement Element for Flags */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_FLAG;
@@ -300,7 +304,7 @@ void ex07_ble_multi_set_advertisement_data( void )
     /* Advertisement Element for CapSense Service */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_128SERVICE_DATA;
     adv_elem[num_elem].len = LEN_UUID_128;
-    adv_elem[num_elem].p_data = capsense_service_uuid;
+    adv_elem[num_elem].p_data = wiced101_service_uuid;
     num_elem++;
 
     /* Set Raw Advertisement Data */
@@ -434,7 +438,7 @@ wiced_bt_dev_status_t ex07_ble_multi_management_callback( wiced_bt_management_ev
             if( memcmp(hostinfo.bdaddr,hostinfoTemp.bdaddr,sizeof(hostinfo.bdaddr) ) == 0) /* Matching address */
             {
                 hostinfo.cccd = hostinfoTemp.cccd;  /* Copy in the cccd value from the temporary holding location */
-                ex07_ble_multi_capsense_buttons_cccd[0] = hostinfo.cccd; /* Set CCCD value from the value that was previously saved in the NVRAM */
+                ex07_ble_multi_wiced101_buttons_cccd[0] = hostinfo.cccd; /* Set CCCD value from the value that was previously saved in the NVRAM */
                 bondIndex = count; /* Remember which NVRAM slot belongs to the currently connected device */
                 WICED_BT_TRACE("\tRestored existing bonded device info from NVRAM %B result: %d \n\r", hostinfo.bdaddr);
                 break; /* Exit out of loop since we found what we need */
@@ -550,7 +554,7 @@ wiced_bt_gatt_status_t ex07_ble_multi_get_value( uint16_t attr_handle, uint16_t 
                     break;
                 case HDLC_GENERIC_ACCESS_APPEARANCE_VALUE:
                     break;
-                case HDLC_CAPSENSE_BUTTONS_VALUE:
+                case HDLC_WICED101_BUTTONS_VALUE:
                     break;
                 }
             }
@@ -610,7 +614,12 @@ wiced_bt_gatt_status_t ex07_ble_multi_set_value( uint16_t attr_handle, uint16_t 
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
-                case HDLD_CAPSENSE_BUTTONS_CLIENT_CONFIGURATION:
+                case HDLC_WICED101_LED_VALUE:
+                    /* Turn the LED on/off depending on the value written to the GATT database */
+                    WICED_BT_TRACE("Output = %d\n", ex07_ble_multi_wiced101_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ex07_ble_multi_wiced101_led[0]);
+                    break;
+                case HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION:
                     if ( len != 2 )
                     {
                         return WICED_BT_GATT_INVALID_ATTR_LEN;
@@ -702,9 +711,11 @@ wiced_bt_gatt_status_t ex07_ble_multi_connect_callback( wiced_bt_gatt_connection
             connection_id = 0;
             memset( hostinfo.bdaddr, 0, sizeof(BD_ADDR));
             /* Reset the CCCD value so that on a reconnect CCCD will be off */
-            ex07_ble_multi_capsense_buttons_cccd[0] = 0;
+            ex07_ble_multi_wiced101_buttons_cccd[0] = 0;
 
-            /* restart the advertisements */
+            /* set timer to correct speed depending on bondMode and restart the advertisements */
+            wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
+            wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
             wiced_bt_start_advertisements(BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL);
         }
         status = WICED_BT_GATT_SUCCESS;
@@ -810,6 +821,14 @@ void ex07_ble_multi_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t len
 }
 #endif
 
+/* Invert LED state when the timer expires if we are advertising to cause the LED to blink */
+void ledBlinkCallback(uint32_t arg)
+{
+    if(0 != wiced_bt_ble_get_current_advert_mode()) /* Advertising */
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, !wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ));
+    }
+}
 
 /* Thread function to read button values from PSoC */
 void i2c_read( uint32_t arg )
@@ -820,7 +839,7 @@ void i2c_read( uint32_t arg )
     /* I2C address and register locations inside the PSoC and a mask for just CapSense buttons */
     #define I2C_ADDRESS        (0x42)
     #define BUTTON_REG         (0x06)
-    #define CAPSENSE_MASK      (0x0F)
+    #define WICED101_MASK      (0x0F)
 
     char i2cReg;               // I2C Read register
     char buttonVal;            // Button value
@@ -838,18 +857,18 @@ void i2c_read( uint32_t arg )
     {
         /* Read button values and mask out just the CapSense buttons */
         wiced_hal_i2c_read( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-        buttonVal = i2cReg & CAPSENSE_MASK;
+        buttonVal = i2cReg & WICED101_MASK;
 
         if(prevVal != buttonVal) /* Only print if value has changed since last time */
         {
             WICED_BT_TRACE( "Button State: %02X\n\r", buttonVal);
-            ex07_ble_multi_capsense_buttons[2] = buttonVal;
+            ex07_ble_multi_wiced101_buttons[2] = buttonVal;
             /* If the connection is up and if the client wants notifications, send it */
             if ( connection_id != 0)
             {
-                 if(ex07_ble_multi_capsense_buttons_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
+                 if(ex07_ble_multi_wiced101_buttons_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
                 {
-                    wiced_bt_gatt_send_notification(connection_id, HDLC_CAPSENSE_BUTTONS_VALUE, sizeof(ex07_ble_multi_capsense_buttons), ex07_ble_multi_capsense_buttons );
+                    wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTONS_VALUE, sizeof(ex07_ble_multi_wiced101_buttons), ex07_ble_multi_wiced101_buttons );
                     WICED_BT_TRACE( "\tSend Notification: sending CapSense value\r\n");
                 }
             }
@@ -857,30 +876,6 @@ void i2c_read( uint32_t arg )
         }
         /* Send the thread to sleep for a period of time */
         wiced_rtos_delay_milliseconds( THREAD_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
-    }
-}
-
-/* Thread function to blink LED when in bonding mode */
-void bonding_led( uint32_t arg )
-{
-    /* Thread will delay so that LED will blink every 250ms */
-    #define LED_DELAY_IN_MS          (250)
-
-    for(;;)
-    {
-        /* Blink LED if we are not already bonded */
-        if(bondMode == WICED_TRUE)
-        {
-            /* Toggle the LED state */
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, ! wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) );
-        }
-        else /* Turn off the LED if already bonded*/
-        {
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, 0);
-        }
-
-        /* Send the thread to sleep for a period of time */
-        wiced_rtos_delay_milliseconds( LED_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
     }
 }
 
@@ -926,6 +921,10 @@ void button_cback1( void *data, uint8_t port_pin )
         bondMode = WICED_FALSE;
         WICED_BT_TRACE( "Bonding Mode Exited\n\r");
     }
+
+    /* Restart timer with correct speed */
+    wiced_stop_timer(&ledBlinkTimer);
+    wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
 
     /* Clear the GPIO interrupt */
     wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );

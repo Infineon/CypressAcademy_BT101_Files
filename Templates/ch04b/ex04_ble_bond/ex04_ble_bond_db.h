@@ -5,13 +5,14 @@
  *
  */
 
-// ex02_ble_con_db.h
+// ex04_ble_bond_db.h
 
 #ifndef __GATT_DATABASE_H__
 #define __GATT_DATABASE_H__
 
-#define __UUID_CAPSENSE                       0x31, 0x01, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xb5, 0xca, 0x03, 0x00
-#define __UUID_CAPSENSE_BUTTONS               0x31, 0x01, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xa3, 0xca, 0x03, 0x00
+#define __UUID_WICED101                       0x31, 0x01, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xb5, 0xca, 0x03, 0x00
+#define __UUID_WICED101_LED                   0xcf, 0x0a, 0x40, 0x04, 0x41, 0x42, 0x40, 0x70, 0xad, 0x61, 0xe1, 0xce, 0xc0, 0x08, 0x2b, 0x41
+#define __UUID_WICED101_BUTTONS               0x31, 0x01, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xa3, 0xca, 0x03, 0x00
 
 // ***** Primary Service 'Generic Attribute'
 #define HDLS_GENERIC_ATTRIBUTE                0x0001
@@ -25,13 +26,16 @@
 #define HDLC_GENERIC_ACCESS_APPEARANCE        0x0017
 #define HDLC_GENERIC_ACCESS_APPEARANCE_VALUE  0x0018
 
-// ***** Primary Service 'CapSense'
-#define HDLS_CAPSENSE                         0x0028
+// ***** Primary Service 'Wiced101'
+#define HDLS_WICED101                         0x0028
+// ----- Characteristic 'LED'
+#define HDLC_WICED101_LED                     0x0029
+#define HDLC_WICED101_LED_VALUE               0x002A
 // ----- Characteristic 'Buttons'
-#define HDLC_CAPSENSE_BUTTONS                 0x0029
-#define HDLC_CAPSENSE_BUTTONS_VALUE           0x002A
+#define HDLC_WICED101_BUTTONS                 0x002B
+#define HDLC_WICED101_BUTTONS_VALUE           0x002C
 // ===== CCCD
-#define HDLD_CAPSENSE_BUTTONS_CLIENT_CONFIGURATION 0x002B
+#define HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION 0x002D
 
 // External Lookup Table Entry
 typedef struct
@@ -45,8 +49,8 @@ typedef struct
 // External definitions
 extern const uint8_t  gatt_database[];
 extern const uint16_t gatt_database_len;
-extern gatt_db_lookup_table ex02_ble_con_gatt_db_ext_attr_tbl[];
-extern const uint16_t ex02_ble_con_gatt_db_ext_attr_tbl_size;
+extern gatt_db_lookup_table ex04_ble_bond_gatt_db_ext_attr_tbl[];
+extern const uint16_t ex04_ble_bond_gatt_db_ext_attr_tbl_size;
 extern uint8_t BT_LOCAL_NAME[];
 extern const uint16_t BT_LOCAL_NAME_CAPACITY;
 

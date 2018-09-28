@@ -17,16 +17,18 @@
 #include "wiced_hal_gpio.h"
 #include "wiced_bt_app_hal_common.h"
 #include "wiced_hal_platform.h"
+#include "wiced_hal_wdog.h"
 #include "wiced_bt_trace.h"
+#include "wiced_bt_stack.h"
+#include "wiced_bt_sdp.h"
+#include "wiced_bt_app_common.h"
 #include "sparcommon.h"
+#include "string.h"
 #include "hci_control_api.h"
 #include "wiced_transport.h"
 #include "wiced_hal_pspi.h"
 #include "key_LED_db.h"
 #include "wiced_bt_cfg.h"
-#include "wiced_bt_stack.h"
-#include "wiced_bt_app_common.h"
-#include "wiced_hal_wdog.h"
 
 
 /*******************************************************************
@@ -137,7 +139,7 @@ void application_start(void)
     wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_PUART );
 
     /* Set the Debug UART as WICED_ROUTE_DEBUG_TO_WICED_UART to send debug strings over the WICED debug interface */
-    //wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_WICED_UART );
+    //  wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_WICED_UART );
 #endif
 
     /* Initialize Bluetooth Controller and Host Stack */
@@ -153,7 +155,7 @@ void key_led_app_init(void)
     wiced_bt_app_init();
 
     /* Allow peer to pair */
-    //wiced_bt_set_pairable_mode(WICED_TRUE, 0);
+    wiced_bt_set_pairable_mode(WICED_FALSE, 0);
 
     /* Set Advertisement Data */
     key_led_set_advertisement_data();
@@ -402,8 +404,8 @@ wiced_bt_gatt_status_t key_led_set_value( uint16_t attr_handle, uint16_t conn_id
                 {
                 case HDLC_WICEDLED_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
-                    WICED_BT_TRACE("Output = %d\n",key_led_wicedled_led[0]);
                     wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, key_led_wicedled_led[0]);
+                    WICED_BT_TRACE("Output = %d\n", key_led_wicedled_led[0]);
                     break;
                 }
             }

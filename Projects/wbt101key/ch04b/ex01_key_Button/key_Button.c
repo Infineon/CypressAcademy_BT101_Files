@@ -158,7 +158,7 @@ void key_button_app_init(void)
     /* Initialize Application */
     wiced_bt_app_init();
 
-    /* Configure the Button GPIO as an input with a resistive pull up and interrupt on rising edge */
+    /* Configure the Button GPIO as an input with a resistive pull up and falling edge interrupt */
     wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
     wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1,
             ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ),

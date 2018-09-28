@@ -191,6 +191,10 @@ wiced_bt_dev_status_t key_classicspp_management_callback( wiced_bt_management_ev
         /* Bluetooth Controller and Host Stack Disabled */
         WICED_BT_TRACE("Bluetooth Disabled\n");
         break;
+    case BTM_PASSKEY_NOTIFICATION_EVT: /* Print passkey to the screen so that the user can enter it. */
+        WICED_BT_TRACE( "Passkey Notification\n\r");
+        WICED_BT_TRACE(">>>>>>>>>>>>>>>>>>>>>>>> PassKey Required for BDA %B, Enter Key: %06d \n\r", p_event_data->user_passkey_notification.bd_addr, p_event_data->user_passkey_notification.passkey );
+        break;
     case BTM_SECURITY_REQUEST_EVT:
         /* Security Request */
         WICED_BT_TRACE("Security Request\n");
@@ -210,7 +214,7 @@ wiced_bt_dev_status_t key_classicspp_management_callback( wiced_bt_management_ev
         p_event_data->pairing_io_capabilities_br_edr_request.oob_data = BTM_OOB_NONE;
         p_event_data->pairing_io_capabilities_br_edr_request.auth_req = BTM_AUTH_SINGLE_PROFILE_GENERAL_BONDING_YES;
         p_event_data->pairing_io_capabilities_br_edr_request.is_orig = WICED_FALSE;
-        p_event_data->pairing_io_capabilities_br_edr_request.local_io_cap = BTM_IO_CAPABILITIES_DISPLAY_ONLY;
+        p_event_data->pairing_io_capabilities_br_edr_request.local_io_cap = BTM_IO_CAPABILITIES_DISPLAY_AND_YES_NO_INPUT;
         break;
     case BTM_PAIRING_COMPLETE_EVT:
         /* Pairing is Complete */

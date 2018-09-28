@@ -44,8 +44,9 @@ extern uint8_t BT_LOCAL_NAME[];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
 
-/* This value will be part of the advertisement packet. It will increment when MB1 is pressed */
-uint8_t manuf_data = 0;
+/* This value will be part of the advertisement packet.
+ * The 1st 2 bytes are Cypress ID. The last byte will increment when MB1 is pressed */
+uint8_t manuf_data[] = {0x31, 0x01, 0x00};
 
 /*******************************************************************
  * Function Prototypes
@@ -172,7 +173,7 @@ void ex02_ble_adv_set_advertisement_data( void )
     /* Advertisement Element for Manufacturer Data */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_MANUFACTURER;
     adv_elem[num_elem].len = sizeof(manuf_data);
-    adv_elem[num_elem].p_data = &manuf_data;
+    adv_elem[num_elem].p_data = manuf_data;
     num_elem++;
 
     /* Set Raw Advertisement Data */
@@ -357,10 +358,10 @@ void button_cback( void *data, uint8_t port_pin )
     wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
 
     /* Increment manufacturing data variable */
-    manuf_data++;
+    manuf_data[2]++;
 
     /* Call routine to setup advertising packet and restart advertising */
     ex02_ble_adv_set_advertisement_data();
-    WICED_BT_TRACE( "Manuf Data updated to %d\n\r", manuf_data );
+    WICED_BT_TRACE( "Manuf Data updated to %d\n\r", manuf_data[2] );
 
 }

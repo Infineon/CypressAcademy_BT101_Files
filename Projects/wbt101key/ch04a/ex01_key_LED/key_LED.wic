@@ -99,12 +99,12 @@
     </Service>
     <Service predefined="false" primary="true">
         <Name>WicedLED</Name>
-        <Uuid>ed 4e 7e d0 cd 55 4e e1 9c 99 34 2e 3c da 86 2d</Uuid>
-        <Description>Vendor Specific Service: key_LED</Description>
+        <Uuid>f1 e8 d1 28 57 f9 42 af b0 ec e0 65 70 c1 3d f8</Uuid>
+        <Description>Vendor Specific Service: WicedLED</Description>
         <Characteristic mandatory="false" predefined="false">
             <Name>LED</Name>
-            <Uuid>24 6a 66 04 ef dd 45 e0 af 57 43 df 1f 56 83 c4</Uuid>
-            <Description>Vendor Specific Characteristic: key_LED</Description>
+            <Uuid>d7 14 dd 68 d4 3b 44 85 8e 11 22 65 5f 9f ca 45</Uuid>
+            <Description>Vendor Specific Characteristic: LED</Description>
             <DataType/>
             <Size>1</Size>
             <InitialValue/>

@@ -1,4 +1,4 @@
-APP_SRC +=  ex02_debug.c
+APP_SRC +=  ex03_debug.c
 
 ifdef DEBUG
 C_FLAGS += -DDEBUG

@@ -209,6 +209,10 @@ wiced_bt_dev_status_t key_classicspp_management_callback( wiced_bt_management_ev
         /* Bluetooth Controller and Host Stack Disabled */
         WICED_BT_TRACE("Bluetooth Disabled\n");
         break;
+    case BTM_PASSKEY_NOTIFICATION_EVT: /* Print passkey to the screen so that the user can enter it. */
+        WICED_BT_TRACE( "Passkey Notification\n\r");
+        WICED_BT_TRACE(">>>>>>>>>>>>>>>>>>>>>>>> PassKey Required for BDA %B, Enter Key: %06d \n\r", p_event_data->user_passkey_notification.bd_addr, p_event_data->user_passkey_notification.passkey );
+        break;
     case BTM_SECURITY_REQUEST_EVT:
         /* Security Request */
         WICED_BT_TRACE("Security Request\n");
