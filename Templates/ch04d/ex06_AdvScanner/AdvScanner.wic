@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<BLE_Smart_Designer>
+    <Chip>20719-B1</Chip>
+    <Designer>WICED 20719-B1</Designer>
+    <DeviceSettings>
+        <Name>AdvScanner</Name>
+        <Appearance>Unknown</Appearance>
+        <BluetoothMode>Single Mode LE</BluetoothMode>
+        <Button>false</Button>
+        <UART>false</UART>
+        <Timer1Sec>false</Timer1Sec>
+        <LED>false</LED>
+        <SPI>false</SPI>
+        <Buzzer>false</Buzzer>
+        <Battery>false</Battery>
+        <GattConfig>
+            <GattDatabase>Disabled</GattDatabase>
+        </GattConfig>
+        <ClassOfDevice>
+            <ServiceClass>
+                <LimitedDiscoverableMode>false</LimitedDiscoverableMode>
+                <Positioning>false</Positioning>
+                <Networking>false</Networking>
+                <Rendering>false</Rendering>
+                <Capturing>false</Capturing>
+                <ObjectTransfer>false</ObjectTransfer>
+                <Audio>false</Audio>
+                <Telephony>false</Telephony>
+                <Information>false</Information>
+            </ServiceClass>
+            <MajorClass>Miscellaneous</MajorClass>
+        </ClassOfDevice>
+    </DeviceSettings>
+    <Service predefined="true" primary="true">
+        <Name>Generic Attribute</Name>
+        <Uuid>1801</Uuid>
+        <Description>Generic Attribute</Description>
+    </Service>
+    <Service predefined="true" primary="true">
+        <Name>Generic Access</Name>
+        <Uuid>1800</Uuid>
+        <Description>The generic_access service contains generic information about the device. All available Characteristics are readonly.</Description>
+        <Characteristic mandatory="true" predefined="true">
+            <Name>Device Name</Name>
+            <Uuid>2A00</Uuid>
+            <Description/>
+            <DataType>org.bluetooth.characteristic.gap.device_name</DataType>
+            <Size>10</Size>
+            <InitialValue>AdvScanner</InitialValue>
+            <Properties>
+                <Read type="Mandatory">true</Read>
+                <Write type="Optional">false</Write>
+                <WriteWithoutResponse type="Excluded">false</WriteWithoutResponse>
+                <SignedWrite type="Excluded">false</SignedWrite>
+                <ReliableWrite type="Excluded">false</ReliableWrite>
+                <Notify type="Excluded">false</Notify>
+                <Indicate type="Excluded">false</Indicate>
+                <WritableAuxiliaries type="Excluded">false</WritableAuxiliaries>
+                <Broadcast type="Excluded">false</Broadcast>
+            </Properties>
+            <Permissions>
+                <VariableLength>false</VariableLength>
+                <Read>true</Read>
+                <Write>false</Write>
+                <WriteWithoutResponse>false</WriteWithoutResponse>
+                <AuthenticatedRead>false</AuthenticatedRead>
+                <ReliableWrite>false</ReliableWrite>
+                <AuthenticatedWrite>false</AuthenticatedWrite>
+            </Permissions>
+        </Characteristic>
+        <Characteristic mandatory="true" predefined="true">
+            <Name>Appearance</Name>
+            <Uuid>2A01</Uuid>
+            <Description>The external appearance of this device. The values are composed of a category (10-bits) and sub-categories (6-bits).</Description>
+            <DataType>org.bluetooth.characteristic.gap.appearance</DataType>
+            <Size>2</Size>
+            <InitialValue>00 00</InitialValue>
+            <Properties>
+                <Read type="Mandatory">true</Read>
+                <Write type="Excluded">false</Write>
+                <WriteWithoutResponse type="Excluded">false</WriteWithoutResponse>
+                <SignedWrite type="Excluded">false</SignedWrite>
+                <ReliableWrite type="Excluded">false</ReliableWrite>
+                <Notify type="Excluded">false</Notify>
+                <Indicate type="Excluded">false</Indicate>
+                <WritableAuxiliaries type="Excluded">false</WritableAuxiliaries>
+                <Broadcast type="Excluded">false</Broadcast>
+            </Properties>
+            <Permissions>
+                <VariableLength>false</VariableLength>
+                <Read>true</Read>
+                <Write>false</Write>
+                <WriteWithoutResponse>false</WriteWithoutResponse>
+                <AuthenticatedRead>false</AuthenticatedRead>
+                <ReliableWrite>false</ReliableWrite>
+                <AuthenticatedWrite>false</AuthenticatedWrite>
+            </Permissions>
+        </Characteristic>
+    </Service>
+</BLE_Smart_Designer>
