@@ -54,6 +54,8 @@ static wiced_transport_buffer_pool_t* transport_pool = NULL;
 
 wiced_bt_device_address_t confirmAddr;
 
+wiced_bool_t doCompare;
+
 uint8_t numBonded=0;
 
 /*******************************************************************
@@ -69,7 +71,6 @@ static void                  key_classicspp_trace_callback      ( wiced_bt_hci_t
 int key_classicspp_read_link_keys( wiced_bt_device_link_keys_t *keys );
 int key_classicspp_write_link_keys( wiced_bt_device_link_keys_t *keys );
 void rx_cback( void *data );
-void button_cback( void *data, uint8_t port_pin );
 /* MultiBond */
 uint8_t readNumBonded(void);
 void saveNumBonded(uint8_t bondedDevices);
@@ -281,18 +282,14 @@ wiced_bt_dev_status_t key_classicspp_management_callback( wiced_bt_management_ev
     case BTM_USER_CONFIRMATION_REQUEST_EVT:
         /* Pairing request, TODO: handle confirmation of numeric compare here if desired */
         WICED_BT_TRACE("numeric_value: %d\n", p_event_data->user_confirmation_request.numeric_value);
-        WICED_BT_TRACE("Press MB1 to accept the connection or MB2 to reject\n");
+        WICED_BT_TRACE("Press 'y' to accept the connection or 'n' to reject\n");
 
         /* Save the BDADDR */
         memcpy(confirmAddr,p_event_data->user_confirmation_request.bd_addr,sizeof(confirmAddr));
 
-        /* Turn on button interrupts */
-        wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
-        wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-        wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_2, button_cback, NULL );
-        wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_2, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
+        doCompare = WICED_TRUE;
 
-        /* This is done in the interrupt callback based on the button press */
+        /* This is done in the  callback based on the key press */
         //wiced_bt_dev_confirm_req_reply( WICED_BT_SUCCESS , p_event_data->user_confirmation_request.bd_addr);
         break;
     default:
@@ -424,29 +421,26 @@ void rx_cback( void *data )
     wiced_hal_puart_read( &readbyte );
     wiced_hal_puart_reset_puart_interrupt();
 
-    /* Transmit the data using the Bluetooth SPP */
-    spp_tx_data(&readbyte, sizeof(readbyte));
-}
-
-
-/* Interrupt callback function for BUTTONS */
-void button_cback( void *data, uint8_t port_pin )
-{
-    /* Turn off pin interrupts */
-    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP  ), GPIO_PIN_OUTPUT_HIGH );
-    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_2, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP  ), GPIO_PIN_OUTPUT_HIGH );
-
-    /* Send appropriate response */
-    if(port_pin == WICED_GPIO_PIN_BUTTON_1) /* Yes */
+    if(doCompare == WICED_TRUE)
     {
-        wiced_bt_dev_confirm_req_reply( WICED_BT_SUCCESS , confirmAddr);
-        WICED_BT_TRACE("Confirm Accepted\n");
+        /* Send appropriate response */
+        if(readbyte == 'y') /* Yes */
+        {
+            wiced_bt_dev_confirm_req_reply( WICED_BT_SUCCESS , confirmAddr);
+            WICED_BT_TRACE("Confirm Accepted\n");
+        }
+        if(readbyte == 'n') /* No */
+        {
+            wiced_bt_dev_confirm_req_reply( WICED_BT_ERROR , confirmAddr);
+            WICED_BT_TRACE("Confirm Failed\n");
+        }
+        /* Disable compare input checking */
+        doCompare = WICED_FALSE;
     }
-    if(port_pin == WICED_GPIO_PIN_BUTTON_2) /* No */
+    else
     {
-        wiced_bt_dev_confirm_req_reply( WICED_BT_ERROR , confirmAddr);
-        WICED_BT_TRACE("Confirm Failed\n");
-
+        /* Transmit the data using the Bluetooth SPP */
+        spp_tx_data(&readbyte, sizeof(readbyte));
     }
 }
 

@@ -609,7 +609,7 @@ void button_cback( void *data, uint8_t port_pin )
         {
             wiced_bt_gatt_send_notification(connection_id, HDLC_WICEDBUTTON_MB1_VALUE,
                     sizeof(key_button_wicedbutton_mb1), key_button_wicedbutton_mb1 );
-            WICED_BT_TRACE( "\tSend Notification: sending CapSense value\r\n");
+            WICED_BT_TRACE( "\tSend Notification: sending Button value\r\n");
         }
     }
 

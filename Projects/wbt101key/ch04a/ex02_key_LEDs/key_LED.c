@@ -39,8 +39,8 @@
 
 #define BLINK_RATE (500)
 
-#define LED_ON  (1)
-#define LED_OFF (0)
+#define LED_ON  (0)
+#define LED_OFF (1)
 
 /*******************************************************************
  * Variable Definitions
@@ -427,7 +427,7 @@ wiced_bt_gatt_status_t key_led_set_value( uint16_t attr_handle, uint16_t conn_id
                 case HDLC_WICEDLED_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
                     WICED_BT_TRACE("Output = %d\n", key_led_wicedled_led[0]);
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, key_led_wicedled_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, !key_led_wicedled_led[0]);
                     break;
                 }
             }

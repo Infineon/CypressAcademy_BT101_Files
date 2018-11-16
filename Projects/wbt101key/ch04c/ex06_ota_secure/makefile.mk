@@ -5,14 +5,16 @@
 APP_SRC =  ex06_ota_secure.c
 APP_SRC += ex06_ota_secure_db.c
 APP_SRC += wiced_bt_cfg.c
+APP_SRC += custom_pin_config.c
 APP_SRC += ecdsa256_pub.c
 
 C_FLAGS += -DWICED_BT_TRACE_ENABLE
-
-$(NAME)_COMPONENTS := fw_upgrade_lib.a
+C_FLAGS += -DSMUX_CHIP=$(CHIP)
 
 # If defined, HCI traces are sent over transport/WICED HCI interface
 C_FLAGS += -DHCI_TRACE_OVER_TRANSPORT
+
+$(NAME)_COMPONENTS := fw_upgrade_lib.a
 
 ########################################################################
 ################ DO NOT MODIFY FILE BELOW THIS LINE ####################

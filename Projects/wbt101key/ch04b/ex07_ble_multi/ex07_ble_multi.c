@@ -5,10 +5,10 @@
  */
 
 /* This project supports saving info for multiple bonded devices. */
-/* MB1 is used to toggle bonding mode. The device must be in bonding mode to pair a new device. */
+/* Enter "e" into the UART to toggle bonding mode. The device must be in bonding mode to pair a new device. */
 /* At initial power-up, the device will start in bonding mode */
 /* If there is no space for more devices, entering bonding mode will erase the oldest set of bonding info */
-/* When MB2 is pressed, the device will dump out a list of bonded devices */
+/* When "l" is entered in the UART, the device will dump out a list of bonded devices */
 
 /** ex07_ble_multi.c
  *
@@ -33,8 +33,7 @@
 #include "wiced_bt_stack.h"
 #include "wiced_bt_app_common.h"
 #include "wiced_hal_wdog.h"
-#include "wiced_rtos.h"
-#include "wiced_hal_i2c.h"
+#include "wiced_hal_puart.h"
 
 /*******************************************************************
  * Constant Definitions
@@ -45,8 +44,8 @@
 #define BONDED_BLINK_RATE  (100)
 #define BONDING_BLINK_RATE (500)
 
-#define LED_ON  (1)
-#define LED_OFF (0)
+#define LED_ON  (0)
+#define LED_OFF (1)
 
 /* Useful macros for thread priorities */
 #define PRIORITY_HIGH               (3)
@@ -75,8 +74,6 @@ extern const wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF_POOLS];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
-
-wiced_thread_t * i2c_thread;
 
 wiced_timer_t ledBlinkTimer;
 uint16_t connection_id = 0;
@@ -118,9 +115,8 @@ static void                   ex07_ble_multi_trace_callback         ( wiced_bt_h
 #endif
 
 void ledBlinkCallback(uint32_t arg);
-void i2c_read( uint32_t arg );
-void button_cback1( void *data, uint8_t port_pin );  // Button ISR to enter bonding mode
-void button_cback2( void *data, uint8_t port_pin );  // Button ISR to enter bonding mode
+void button_cback( void *data, uint8_t port_pin );  // Button ISR
+void rx_cback( void *data );
 
 /*******************************************************************
  * Macro Definitions
@@ -154,8 +150,8 @@ wiced_transport_cfg_t transport_cfg =
 uint8_t ex07_ble_multi_generic_access_device_name[] = {'k','e','y','_','m','u','l','t'};
 uint8_t ex07_ble_multi_generic_access_appearance[]  = {0x00,0x00};
 uint8_t ex07_ble_multi_wiced101_led[]               = {0x00};
-uint8_t ex07_ble_multi_wiced101_buttons[]           = {0x04,0x00,0x00};
-uint8_t ex07_ble_multi_wiced101_buttons_cccd[]      = {0x00,0x00};
+uint8_t ex07_ble_multi_wiced101_button[]           =  {0x00};
+uint8_t ex07_ble_multi_wiced101_button_cccd[]      =  {0x00,0x00};
 
 /*******************************************************************
  * GATT Lookup Table
@@ -169,8 +165,8 @@ gatt_db_lookup_table ex07_ble_multi_gatt_db_ext_attr_tbl[] =
     {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      8,      8,      ex07_ble_multi_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,       2,      2,      ex07_ble_multi_generic_access_appearance},
     {HDLC_WICED101_LED_VALUE,                    1,      1,      ex07_ble_multi_wiced101_led},
-    {HDLC_WICED101_BUTTONS_VALUE,                3,      3,      ex07_ble_multi_wiced101_buttons},
-    {HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION, 2,      2,      ex07_ble_multi_wiced101_buttons_cccd},
+    {HDLC_WICED101_BUTTON_VALUE,                 1,      1,      ex07_ble_multi_wiced101_button},
+    {HDLD_WICED101_BUTTON_CLIENT_CONFIGURATION,  2,      2,      ex07_ble_multi_wiced101_button_cccd},
 };
 
 // Number of Lookup Table Entries
@@ -224,21 +220,8 @@ void ex07_ble_multi_app_init(void)
     wiced_bt_app_init();
 
     /* Configure the Button GPIOs as inputs with a resistive pull up and interrupt on rising edge */
-    wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback1, NULL );
-    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-
-    wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_2, button_cback2, NULL );
-    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_2, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-
-    /* Start a thread to read button values */
-     i2c_thread = wiced_rtos_create_thread();       // Get memory for the thread handle
-     wiced_rtos_init_thread(
-             i2c_thread,                     // Thread handle
-             PRIORITY_MEDIUM,                // Priority
-             "Buttons",                      // Name
-             i2c_read,                       // Function
-             THREAD_STACK_MIN_SIZE,          // Stack
-             NULL );                         // Function argument
+    wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
+    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_BOTH_EDGE ), GPIO_PIN_OUTPUT_HIGH );
 
     /* Allow peer to pair */
     wiced_bt_set_pairable_mode(WICED_TRUE, 0);
@@ -275,6 +258,14 @@ void ex07_ble_multi_app_init(void)
     /* Initialize timer that will blink LED during advertising - speed depends on if we are bonded or not */
     wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
     wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
+
+    /* Setup the UART for input so that we can erase bonding information */
+    /* UART transmit is already setup by the WICED_DEBUG_TRACE configuration */
+    /* Enable receive and the interrupt */
+    wiced_hal_puart_register_interrupt( rx_cback );
+    /* Set watermark level to 1 to receive interrupt up on receiving each byte */
+    wiced_hal_puart_set_watermark_level( 1 );
+    wiced_hal_puart_enable_rx();
 
     /* Start Undirected LE Advertisements on device startup.
      * The corresponding parameters are contained in 'wiced_bt_cfg.c' */
@@ -317,6 +308,14 @@ void ex07_ble_multi_advertisement_stopped( void )
     WICED_BT_TRACE("Advertisement stopped\n");
 
     /* TODO: Handle when advertisements stop */
+    if(0 == connection_id) /* Not connected */
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_OFF);
+    }
+    else
+    {
+        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_ON);
+    }
 }
 
 /* TODO: This function should be called when the device needs to be reset */
@@ -438,7 +437,7 @@ wiced_bt_dev_status_t ex07_ble_multi_management_callback( wiced_bt_management_ev
             if( memcmp(hostinfo.bdaddr,hostinfoTemp.bdaddr,sizeof(hostinfo.bdaddr) ) == 0) /* Matching address */
             {
                 hostinfo.cccd = hostinfoTemp.cccd;  /* Copy in the cccd value from the temporary holding location */
-                ex07_ble_multi_wiced101_buttons_cccd[0] = hostinfo.cccd; /* Set CCCD value from the value that was previously saved in the NVRAM */
+                ex07_ble_multi_wiced101_button_cccd[0] = hostinfo.cccd; /* Set CCCD value from the value that was previously saved in the NVRAM */
                 bondIndex = count; /* Remember which NVRAM slot belongs to the currently connected device */
                 WICED_BT_TRACE("\tRestored existing bonded device info from NVRAM %B result: %d \n\r", hostinfo.bdaddr);
                 break; /* Exit out of loop since we found what we need */
@@ -554,7 +553,7 @@ wiced_bt_gatt_status_t ex07_ble_multi_get_value( uint16_t attr_handle, uint16_t 
                     break;
                 case HDLC_GENERIC_ACCESS_APPEARANCE_VALUE:
                     break;
-                case HDLC_WICED101_BUTTONS_VALUE:
+                case HDLC_WICED101_BUTTON_VALUE:
                     break;
                 }
             }
@@ -617,9 +616,9 @@ wiced_bt_gatt_status_t ex07_ble_multi_set_value( uint16_t attr_handle, uint16_t 
                 case HDLC_WICED101_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
                     WICED_BT_TRACE("Output = %d\n", ex07_ble_multi_wiced101_led[0]);
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ex07_ble_multi_wiced101_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, !ex07_ble_multi_wiced101_led[0]);
                     break;
-                case HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION:
+                case HDLD_WICED101_BUTTON_CLIENT_CONFIGURATION:
                     if ( len != 2 )
                     {
                         return WICED_BT_GATT_INVALID_ATTR_LEN;
@@ -711,7 +710,7 @@ wiced_bt_gatt_status_t ex07_ble_multi_connect_callback( wiced_bt_gatt_connection
             connection_id = 0;
             memset( hostinfo.bdaddr, 0, sizeof(BD_ADDR));
             /* Reset the CCCD value so that on a reconnect CCCD will be off */
-            ex07_ble_multi_wiced101_buttons_cccd[0] = 0;
+            ex07_ble_multi_wiced101_button_cccd[0] = 0;
 
             /* set timer to correct speed depending on bondMode and restart the advertisements */
             wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
@@ -830,116 +829,93 @@ void ledBlinkCallback(uint32_t arg)
     }
 }
 
-/* Thread function to read button values from PSoC */
-void i2c_read( uint32_t arg )
+
+/* Interrupt callback function for BUTTON_1 */
+void button_cback( void *data, uint8_t port_pin )
 {
-    /* Thread will delay so that button values are read every 100ms */
-    #define THREAD_DELAY_IN_MS          (100)
+    /* Clear the GPIO interrupt (this is not strictly needed since it is done automatically for buttons) */
+    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
 
-    /* I2C address and register locations inside the PSoC and a mask for just CapSense buttons */
-    #define I2C_ADDRESS        (0x42)
-    #define BUTTON_REG         (0x06)
-    #define WICED101_MASK      (0x0F)
+    /* Save button state in the GATT array */
+    ex07_ble_multi_wiced101_button[0] = !wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 );
 
-    char i2cReg;               // I2C Read register
-    char buttonVal;            // Button value
-    char prevVal = 0x00;       // Previous button value
-
-    /* Configure I2C block */
-    wiced_hal_i2c_init();
-    wiced_hal_i2c_set_speed( I2CM_SPEED_400KHZ );
-
-    /* Write the offset to allow reading of the button register */
-    i2cReg = BUTTON_REG;
-    wiced_hal_i2c_write( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-
-    for(;;)
+    /* Send notification if there is a connection and notifications are enabled */
+    if ( connection_id != 0)
     {
-        /* Read button values and mask out just the CapSense buttons */
-        wiced_hal_i2c_read( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-        buttonVal = i2cReg & WICED101_MASK;
-
-        if(prevVal != buttonVal) /* Only print if value has changed since last time */
+         if(ex07_ble_multi_wiced101_button_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
         {
-            WICED_BT_TRACE( "Button State: %02X\n\r", buttonVal);
-            ex07_ble_multi_wiced101_buttons[2] = buttonVal;
-            /* If the connection is up and if the client wants notifications, send it */
-            if ( connection_id != 0)
-            {
-                 if(ex07_ble_multi_wiced101_buttons_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
-                {
-                    wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTONS_VALUE, sizeof(ex07_ble_multi_wiced101_buttons), ex07_ble_multi_wiced101_buttons );
-                    WICED_BT_TRACE( "\tSend Notification: sending CapSense value\r\n");
-                }
-            }
-            prevVal = buttonVal;
+            wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTON_VALUE, sizeof(ex07_ble_multi_wiced101_button), ex07_ble_multi_wiced101_button );
+            WICED_BT_TRACE( "\tSend Notification: sending Button value\r\n");
         }
-        /* Send the thread to sleep for a period of time */
-        wiced_rtos_delay_milliseconds( THREAD_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
     }
 }
 
-/* Interrupt callback function for BUTTON_1  - toggle bonding mode */
-/* If bonding space is full, remove the oldest set of info before entering bonding mode */
-void button_cback1( void *data, uint8_t port_pin )
+
+/* Interrupt callback function for UART */
+void rx_cback( void *data )
 {
+    uint8_t  readbyte;
     wiced_result_t                  result;
     wiced_bt_device_link_keys_t     link_keys;
     wiced_bt_local_identity_keys_t  local_keys;
     BD_ADDR                         bonded_address;
+    uint8_t                         count;
+    wiced_bt_dev_status_t           status;
 
-    if(bondMode == WICED_FALSE) /* Enter bond mode */
+    /* Read one byte from the buffer and (unlike GPIO) reset the interrupt */
+    wiced_hal_puart_read( &readbyte );
+    wiced_hal_puart_reset_puart_interrupt();
+
+    /* Remove bonding info if the user sends 'e' */
+    switch( readbyte)
     {
-        /* Check to see if we need to erase one of the existing devices */
-        if(bondInfo[NUM_BONDED] == BOND_MAX)
+    case 'e':
+        if(bondMode == WICED_FALSE) /* Enter bond mode */
         {
-            /* Remove oldest device from the bonded device list */
-            wiced_hal_read_nvram( WICED_NVRAM_HOST_INFO0 + bondInfo[NEXT_FREE], sizeof(bonded_address), (uint8_t*)&bonded_address, &result );
-            wiced_bt_dev_delete_bonded_device(bonded_address);
-            WICED_BT_TRACE( "Remove host %B from bonded device list \n\r", bonded_address );
+            /* Check to see if we need to erase one of the existing devices */
+            if(bondInfo[NUM_BONDED] == BOND_MAX)
+            {
+                /* Remove oldest device from the bonded device list */
+                wiced_hal_read_nvram( WICED_NVRAM_HOST_INFO0 + bondInfo[NEXT_FREE], sizeof(bonded_address), (uint8_t*)&bonded_address, &result );
+                wiced_bt_dev_delete_bonded_device(bonded_address);
+                WICED_BT_TRACE( "Remove host %B from bonded device list \n\r", bonded_address );
 
-            /* Remove oldest device from address resolution database */
-            wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS0 + bondInfo[NEXT_FREE], sizeof(wiced_bt_device_link_keys_t), (uint8_t*)&link_keys, &result);
-            wiced_bt_dev_remove_device_from_address_resolution_db ( &link_keys );
+                /* Remove oldest device from address resolution database */
+                wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS0 + bondInfo[NEXT_FREE], sizeof(wiced_bt_device_link_keys_t), (uint8_t*)&link_keys, &result);
+                wiced_bt_dev_remove_device_from_address_resolution_db ( &link_keys );
 
-            /* Remove oldest device bonding information from NVRAM */
-            memset( &hostinfoTemp, 0, sizeof(hostinfoTemp));
-            memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
-            wiced_hal_write_nvram( WICED_NVRAM_HOST_INFO0 + bondInfo[NEXT_FREE], sizeof(hostinfoTemp), (uint8_t*)&hostinfoTemp, &result );
-            wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS0 + bondInfo[NEXT_FREE], sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
+                /* Remove oldest device bonding information from NVRAM */
+                memset( &hostinfoTemp, 0, sizeof(hostinfoTemp));
+                memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
+                wiced_hal_write_nvram( WICED_NVRAM_HOST_INFO0 + bondInfo[NEXT_FREE], sizeof(hostinfoTemp), (uint8_t*)&hostinfoTemp, &result );
+                wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS0 + bondInfo[NEXT_FREE], sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
 
-            /* Reduce number of bonded devices by one */
-            bondInfo[NUM_BONDED]--;
+                /* Reduce number of bonded devices by one */
+                bondInfo[NUM_BONDED]--;
+            }
+
+            /* Put into bonding mode  */
+            bondMode = WICED_TRUE;
+            WICED_BT_TRACE( "Bonding Mode Entered\n\r");
+        }
+        else /* Exit bonding mode */
+        {
+            bondMode = WICED_FALSE;
+            WICED_BT_TRACE( "Bonding Mode Exited\n\r");
         }
 
-        /* Put into bonding mode  */
-        bondMode = WICED_TRUE;
-        WICED_BT_TRACE( "Bonding Mode Entered\n\r");
-    }
-    else /* Exit bonding mode */
-    {
-        bondMode = WICED_FALSE;
-        WICED_BT_TRACE( "Bonding Mode Exited\n\r");
-    }
-
-    /* Restart timer with correct speed */
-    wiced_stop_timer(&ledBlinkTimer);
-    wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
-
-    /* Clear the GPIO interrupt */
-    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
-}
-
-void button_cback2( void *data, uint8_t port_pin )
-{
-    uint8_t count;
-    wiced_bt_dev_status_t status;
-    wiced_bt_device_link_keys_t link_keys;
-
-    WICED_BT_TRACE("Number of bonded devices: %d, Next free slot: %d\n",bondInfo[NUM_BONDED], bondInfo[NEXT_FREE]);
-    for(count = 0; count < bondInfo[NUM_BONDED]; count++)
-    {
-        wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS0 + count, sizeof(link_keys), (uint8_t*)&link_keys, &status );
-        WICED_BT_TRACE("\tBD_ADDR: %B\n\r", &link_keys);
+        /* Restart timer with correct speed */
+        wiced_stop_timer(&ledBlinkTimer);
+        wiced_start_timer(&ledBlinkTimer, bondMode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
+        break;
+    case 'l' :
+        WICED_BT_TRACE("Number of bonded devices: %d, Next free slot: %d\n",bondInfo[NUM_BONDED], bondInfo[NEXT_FREE]);
+        for(count = 0; count < bondInfo[NUM_BONDED]; count++)
+        {
+            wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS0 + count, sizeof(link_keys), (uint8_t*)&link_keys, &status );
+            WICED_BT_TRACE("\tBD_ADDR: %B\n\r", &link_keys);
+        }
+        break;
     }
 }
+

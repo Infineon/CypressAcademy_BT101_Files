@@ -17,16 +17,18 @@
 #include "wiced_hal_gpio.h"
 #include "wiced_bt_app_hal_common.h"
 #include "wiced_hal_platform.h"
+#include "wiced_hal_wdog.h"
 #include "wiced_bt_trace.h"
+#include "wiced_bt_stack.h"
+#include "wiced_bt_sdp.h"
+#include "wiced_bt_app_common.h"
 #include "sparcommon.h"
+#include "string.h"
 #include "hci_control_api.h"
 #include "wiced_transport.h"
 #include "wiced_hal_pspi.h"
 #include "ex05_ota_db.h"
 #include "wiced_bt_cfg.h"
-#include "wiced_bt_stack.h"
-#include "wiced_bt_app_common.h"
-#include "wiced_hal_wdog.h"
 #include "wiced_bt_firmware_upgrade.h"
 #include "wiced_bt_fw_upgrade.h"
 
@@ -139,7 +141,7 @@ void application_start(void)
     wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_PUART );
 
     /* Set the Debug UART as WICED_ROUTE_DEBUG_TO_WICED_UART to send debug strings over the WICED debug interface */
-    //wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_WICED_UART );
+    //  wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_WICED_UART );
 #endif
 
     /* Initialize Bluetooth Controller and Host Stack */
@@ -155,7 +157,7 @@ void ex05_ota_app_init(void)
     wiced_bt_app_init();
 
     /* Allow peer to pair */
-    //wiced_bt_set_pairable_mode(WICED_TRUE, 0);
+    wiced_bt_set_pairable_mode(WICED_FALSE, 0);
 
     /* Set Advertisement Data */
     ex05_ota_set_advertisement_data();
@@ -407,9 +409,10 @@ wiced_bt_gatt_status_t ex05_ota_set_value( uint16_t attr_handle, uint16_t conn_i
                 {
                 case HDLC_WICEDLED_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
-                    WICED_BT_TRACE("Output = %d\n",ex05_ota_wicedled_led[0]);
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1,  (ex05_ota_wicedled_led[0] & 0x01 ));
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ((ex05_ota_wicedled_led[0] & 0x02 ) >> 1) );
+                    WICED_BT_TRACE("Output = %d\n", ex05_ota_wicedled_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1,  !(ex05_ota_wicedled_led[0] & 0x01 ));
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, !((ex05_ota_wicedled_led[0] & 0x02 ) >> 1) );
+
                     break;
                 }
             }
@@ -563,8 +566,7 @@ wiced_bt_gatt_status_t ex05_ota_server_callback( uint16_t conn_id, wiced_bt_gatt
         status = ex05_ota_write_handler( &p_data->write_req, conn_id );
         break;
     case GATTS_REQ_TYPE_CONF:
-        status = ex05_ota_indication_cfm_handler(p_data->handle, conn_id);
-        break;
+         status = ex05_ota_indication_cfm_handler(p_data->handle, conn_id);
     }
 
     return status;

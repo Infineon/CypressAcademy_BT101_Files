@@ -1,4 +1,4 @@
-/* Blink LED_1 with a frequency of 2 Hz */
+/* Use a MUTEX to lock access to an LED */
 
 #include "wiced.h"
 #include "wiced_platform.h"
@@ -9,10 +9,11 @@
 /*****************************    Constants   *****************************/
 /* Thread will delay for 250ms so that LED frequency will be 500ms = 2 Hz */
 /* Comment out the following line to see what happens without the mutex */
+
 #define USE_MUTEX
 
-#define THREAD_DELAY_IN_MS           (250)
-#define THREAD2_DELAY_IN_MS          (200)
+#define THREAD_DELAY_IN_MS           (100)
+#define THREAD2_DELAY_IN_MS          (250)
 
 /* Useful macros for thread priorities */
 #define PRIORITY_HIGH               (3)
@@ -24,6 +25,7 @@
 
 /*****************************    Variables   *****************************/
 #ifdef USE_MUTEX
+/* TODO: Declare pointer to a mutex structure */
 wiced_mutex_t*  led_mutex;
 #endif
 wiced_thread_t * led_thread;
@@ -54,7 +56,8 @@ wiced_result_t bt_cback( wiced_bt_management_evt_t event, wiced_bt_management_ev
         case BTM_ENABLED_EVT:
             /* Setup Mutex */
              #ifdef USE_MUTEX
-             led_mutex = wiced_rtos_create_mutex();
+            /* TODO: Create and initialize the mutex */
+            led_mutex = wiced_rtos_create_mutex();
              wiced_rtos_init_mutex(led_mutex);
              #endif
             /* Start a thread to control LED blinking with button 1 */
@@ -84,26 +87,28 @@ wiced_result_t bt_cback( wiced_bt_management_evt_t event, wiced_bt_management_ev
 }
 
 
-/* Thread function to control the LED with button 1 */
+/* Thread function to control the LED with the button */
 void led_control( uint32_t arg )
 {
     uint32_t led;
 
-    for(;;)
+    while(1)
     {
         #ifdef USE_MUTEX
+        /* TODO: Lock Mutex before checking if button is pressed to make sure you have access to the LED */
         wiced_rtos_lock_mutex(led_mutex);
         #endif
-        /* Loop while button is pressed */
+        /* Blink LED only while button is pressed */
         while(0 == wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 ))
         {
-            led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 );
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, ! led );
+            led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_2 );
+            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, ! led );
 
             /* Send the thread to sleep for a period of time */
             wiced_rtos_delay_milliseconds( THREAD_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
         }
         #ifdef USE_MUTEX
+        /* TODO: Unlock Mutex when button is not pressed to allow other thread to have access */
         wiced_rtos_unlock_mutex(led_mutex);
         #endif
         /* Yield control when button is not pressed */
@@ -112,29 +117,26 @@ void led_control( uint32_t arg )
 }
 
 
-/* Thread function to control the LED with button 2 */
+/* Thread function to just blink the LED */
 void led_control2( uint32_t arg )
 {
     uint32_t led;
 
-    for(;;)
+    while(1)
     {
         #ifdef USE_MUTEX
+        /* TODO: Lock Mutex to make sure you have access to the LED */
         wiced_rtos_lock_mutex(led_mutex);
         #endif
-        /* Loop while button is pressed */
-        while(0 == wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_2 ))
-        {
-            led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 );
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, ! led );
+        /* Blink LED at a fixed rate */
+        led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_2 );
+        wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, ! led );
 
-            /* Send the thread to sleep for a period of time */
-            wiced_rtos_delay_milliseconds( THREAD2_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
-        }
+        /* Send the thread to sleep for a period of time */
+        wiced_rtos_delay_milliseconds( THREAD2_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
         #ifdef USE_MUTEX
+        /* TODO: Unlock Mutex when done with the LED to allow other thread to have access */
         wiced_rtos_unlock_mutex(led_mutex);
         #endif
-        /* Yield control when button is not pressed */
-        wiced_rtos_delay_milliseconds( 1, ALLOW_THREAD_TO_SLEEP );
     }
 }

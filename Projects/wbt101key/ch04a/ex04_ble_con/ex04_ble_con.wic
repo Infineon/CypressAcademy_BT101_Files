@@ -99,11 +99,11 @@
     </Service>
     <Service predefined="false" primary="true">
         <Name>Wiced101</Name>
-        <Uuid>31 01 9B 5F 80 00 00 80 00 10 00 00 B5 CA 03 00</Uuid>
+        <Uuid>01 ee 1f 93 07 fc 40 99 99 bc 55 96 ec 3a b9 5b</Uuid>
         <Description>Vendor Specific Service: Wiced101</Description>
         <Characteristic mandatory="false" predefined="false">
             <Name>LED</Name>
-            <Uuid>cf 0a 40 04 41 42 40 70 ad 61 e1 ce c0 08 2b 41</Uuid>
+            <Uuid>fd 01 e4 3b d7 56 4b 2f 98 19 de 07 56 54 32 5d</Uuid>
             <Description>Vendor Specific Characteristic: LED</Description>
             <DataType/>
             <Size>1</Size>
@@ -125,12 +125,12 @@
             </Permissions>
         </Characteristic>
         <Characteristic mandatory="false" predefined="false">
-            <Name>Buttons</Name>
-            <Uuid>31 01 9B 5F 80 00 00 80 00 10 00 00 A3 CA 03 00</Uuid>
-            <Description>Vendor Specific Characteristic: Buttons</Description>
+            <Name>Button</Name>
+            <Uuid>b1 fa 18 1a b6 aa 44 40 bf 6f 57 c2 54 b2 33 ea</Uuid>
+            <Description>Vendor Specific Characteristic: Button</Description>
             <DataType/>
-            <Size>3</Size>
-            <InitialValue>04 00 00</InitialValue>
+            <Size>1</Size>
+            <InitialValue/>
             <Properties>
                 <Read>true</Read>
                 <Notify>false</Notify>

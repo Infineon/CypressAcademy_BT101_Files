@@ -4,7 +4,7 @@
  *
  */
 
-/** ex02_ble_adv.c
+/** ex03_ble_adv.c
  *
  */
 

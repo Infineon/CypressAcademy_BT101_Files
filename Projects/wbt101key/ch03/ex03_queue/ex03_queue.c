@@ -100,9 +100,9 @@ void led_control( uint32_t arg )
         /* Blink the number of times indicated by the queue */
         for( loop = 0; loop < blinkValue; loop++)
         {
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
+            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_HIGH );
             wiced_rtos_delay_milliseconds( 250, ALLOW_THREAD_TO_SLEEP );
-            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
+            wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_LOW );
             wiced_rtos_delay_milliseconds( 250, ALLOW_THREAD_TO_SLEEP );
         }
         /* Wait 1 second between button presses */

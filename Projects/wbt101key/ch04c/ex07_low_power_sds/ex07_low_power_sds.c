@@ -29,23 +29,16 @@
 #include "wiced_hal_wdog.h"
 #include "wiced_rtos.h"
 #include "wiced_hal_i2c.h"
+#include "wiced_hal_puart.h"
 #include "wiced_sleep.h"
 #include "wiced_bt_l2c.h"
-#include "wiced_hidd_lib.h"
+
 
 /*******************************************************************
  * Constant Definitions
  ******************************************************************/
 #define TRANS_UART_BUFFER_SIZE  1024
 #define TRANS_UART_BUFFER_COUNT 2
-
-/* Useful macros for thread priorities */
-#define PRIORITY_HIGH               (3)
-#define PRIORITY_MEDIUM             (5)
-#define PRIORITY_LOW                (7)
-
-/* Sensible stack size for most threads */
-#define THREAD_STACK_MIN_SIZE       (500)
 
 /* NVSRAM locations available for application data - NVSRAM Volatile Section Identifier */
 #define WICED_NVRAM_LOCAL_KEYS         ( WICED_NVRAM_VSID_START + 1 )
@@ -58,7 +51,6 @@ extern const wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF_POOLS];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
-wiced_thread_t * i2c_thread;
 
 PLACE_IN_ALWAYS_ON_RAM uint16_t connection_id = 0;
 PLACE_IN_ALWAYS_ON_RAM wiced_bt_ble_advert_mode_t advert_mode = BTM_BLE_ADVERT_UNDIRECTED_HIGH;
@@ -75,9 +67,6 @@ struct
 wiced_sleep_boot_type_t low_power_boot_mode; /* Store Boot mode: Cold or Warm (Fast) */
 uint8_t                 sleep_type = WICED_SLEEP_NOT_ALLOWED;  /* Store if sleep is allowed and which type (shutdown or not) */
 wiced_sleep_config_t    sleep_config; /* Sleep configuration structure */
-
-/* Previous CapSense button value - keep in AON RAM so we know on wakeup if button was pressed when we went to sleep */
-PLACE_IN_ALWAYS_ON_RAM char prevVal = 0x00;
 
 /*******************************************************************
  * Function Prototypes
@@ -97,8 +86,8 @@ static uint32_t               hci_control_process_rx_cmd          ( uint8_t* p_d
 #ifdef HCI_TRACE_OVER_TRANSPORT
 static void                   ex07_low_power_sds_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
 #endif
-void i2c_read( uint32_t arg );
 void button_cback( void *data, uint8_t port_pin );  // Button ISR to enter bonding mode
+void rx_cback( void *data );
 uint32_t low_power_sleep_callback(wiced_sleep_poll_type_t type );
 
 /*******************************************************************
@@ -133,8 +122,8 @@ wiced_transport_cfg_t transport_cfg =
 uint8_t ex07_low_power_sds_generic_access_device_name[] = {'k','e','y','_','l','p'};
 uint8_t ex07_low_power_sds_generic_access_appearance[]  = {0x00,0x00};
 uint8_t ex07_low_power_sds_wiced101_led[]               = {0x00};
-uint8_t ex07_low_power_sds_wiced101_buttons[]           = {0x04,0x00,0x00};
-uint8_t ex07_low_power_sds_wiced101_buttons_cccd[]      = {0x00,0x00};
+uint8_t ex07_low_power_sds_wiced101_button[]            = {0x00};
+uint8_t ex07_low_power_sds_wiced101_button_cccd[]       = {0x00,0x00};
 
 /*******************************************************************
  * GATT Lookup Table
@@ -148,8 +137,8 @@ gatt_db_lookup_table ex07_low_power_sds_gatt_db_ext_attr_tbl[] =
     {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE,      6,      6,      ex07_low_power_sds_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,       2,      2,      ex07_low_power_sds_generic_access_appearance},
     {HDLC_WICED101_LED_VALUE,                    1,      1,      ex07_low_power_sds_wiced101_led},
-    {HDLC_WICED101_BUTTONS_VALUE,                3,      3,      ex07_low_power_sds_wiced101_buttons},
-    {HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION, 2,      2,      ex07_low_power_sds_wiced101_buttons_cccd},
+    {HDLC_WICED101_BUTTON_VALUE,                 1,      1,      ex07_low_power_sds_wiced101_button},
+    {HDLD_WICED101_BUTTON_CLIENT_CONFIGURATION,  2,      2,      ex07_low_power_sds_wiced101_button_cccd},
 };
 
 // Number of Lookup Table Entries
@@ -216,38 +205,9 @@ void ex07_low_power_sds_app_init(void)
     /* Initialize Application */
     wiced_bt_app_init();
 
+    /* Configure the Button GPIO as an input with a resistive pull up and interrupt on both edges */
     wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
-
-    /* Initialze depending on cold or warm (fast) boot condition */
-    if(WICED_SLEEP_COLD_BOOT ==  low_power_boot_mode)
-    {
-        WICED_BT_TRACE( "Cold Boot \n\r");
-        /* Configure the Button GPIO as an input with a resistive pull up and interrupt on rising edge */
-         wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-    }
-    else // Warm (Fast) Boot - just came out of SDS
-    {
-        WICED_BT_TRACE( "f"); // Just display "f" for fast boot
-        if(0 != connection_id) /* Already connected so we need to read the connection info from NVRAM */
-        {
-            wiced_hal_read_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
-            /* Set CCCD value from the value that was previously saved in the NVRAM */
-            ex07_low_power_sds_wiced101_buttons_cccd[0] = hostinfo.cccd;
-
-            /* Set CapSense button value in the GATT array from the prevVal which is stored in AON RAM */
-            ex07_low_power_sds_wiced101_buttons[2] = prevVal;
-        }
-    }
-
-    /* Start a thread to read button values */
-    i2c_thread = wiced_rtos_create_thread();       // Get memory for the thread handle
-    wiced_rtos_init_thread(
-            i2c_thread,                     // Thread handle
-            PRIORITY_LOW,                // Priority
-            "Buttons",                      // Name
-            i2c_read,                       // Function
-            THREAD_STACK_MIN_SIZE,          // Stack
-            NULL );                         // Function argument
+    wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_BOTH_EDGE ), GPIO_PIN_OUTPUT_HIGH );
 
     /* Allow peer to pair */
     wiced_bt_set_pairable_mode(WICED_TRUE, 0);
@@ -276,6 +236,41 @@ void ex07_low_power_sds_app_init(void)
 
     /* Initialize GATT Database */
     wiced_bt_gatt_db_init( gatt_database, gatt_database_len );
+
+    /* Setup the UART for input so that we can erase bonding information */
+    /* UART transmit is already setup by the WICED_DEBUG_TRACE configuration */
+    /* Enable receive and the interrupt */
+    wiced_hal_puart_register_interrupt( rx_cback );
+    /* Set watermark level to 1 to receive interrupt up on receiving each byte */
+    wiced_hal_puart_set_watermark_level( 1 );
+    wiced_hal_puart_enable_rx();
+
+    /* Initialze depending on cold or warm (fast) boot condition */
+    if(WICED_SLEEP_COLD_BOOT ==  low_power_boot_mode)
+    {
+        WICED_BT_TRACE( "Cold Boot \n\r");
+    }
+    else // Warm (Fast) Boot - just came out of SDS
+    {
+        WICED_BT_TRACE( "f"); // Just display "f" for fast boot
+        if(0 != connection_id) /* Already connected so we need to read the connection info from NVRAM */
+        {
+            wiced_hal_read_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
+            /* Set CCCD value from the value that was previously saved in the NVRAM */
+            ex07_low_power_sds_wiced101_button_cccd[0] = hostinfo.cccd;
+
+            /* Store the current button state */
+            ex07_low_power_sds_wiced101_button[0] = !wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 );
+            /* Send notification if notifications are enabled */
+            /* This is necessary because a button event will cause a wake from SDS
+               but will not generate the interrupt callback */
+             if(ex07_low_power_sds_wiced101_button_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
+            {
+                wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTON_VALUE, sizeof(ex07_low_power_sds_wiced101_button), ex07_low_power_sds_wiced101_button );
+                WICED_BT_TRACE( "\tSend Notification: sending Button value %d\r\n", ex07_low_power_sds_wiced101_button[0], result);
+            }
+        }
+    }
 
     /* Check to see if connected and start advertisements if not. Set appropriate sleep mode depending on connection status */
     if(0 == connection_id)
@@ -440,7 +435,7 @@ wiced_bt_dev_status_t ex07_low_power_sds_management_callback( wiced_bt_managemen
         {
             wiced_hal_read_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &(p_event_data->encryption_status.result) );
             /* Set CCCD value from the value that was previously saved in the NVRAM */
-            ex07_low_power_sds_wiced101_buttons_cccd[0] = hostinfo.cccd;
+            ex07_low_power_sds_wiced101_button_cccd[0] = hostinfo.cccd;
             WICED_BT_TRACE("\tRestored existing bonded device info from NVRAM %B result: %d \n\r", hostinfo.bdaddr);
         }
         /*Allow shutdown only after encryption as encryption can't be done in SDS */
@@ -559,7 +554,7 @@ wiced_bt_gatt_status_t ex07_low_power_sds_get_value( uint16_t attr_handle, uint1
                     break;
                 case HDLC_GENERIC_ACCESS_APPEARANCE_VALUE:
                     break;
-                case HDLC_WICED101_BUTTONS_VALUE:
+                case HDLC_WICED101_BUTTON_VALUE:
                     break;
                 }
             }
@@ -622,9 +617,9 @@ wiced_bt_gatt_status_t ex07_low_power_sds_set_value( uint16_t attr_handle, uint1
                 case HDLC_WICED101_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
                     WICED_BT_TRACE("Output = %d\n", ex07_low_power_sds_wiced101_led[0]);
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ex07_low_power_sds_wiced101_led[0]);
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, !ex07_low_power_sds_wiced101_led[0]);
                     break;
-                case HDLD_WICED101_BUTTONS_CLIENT_CONFIGURATION:
+                case HDLD_WICED101_BUTTON_CLIENT_CONFIGURATION:
                     if ( len != 2 )
                     {
                         return WICED_BT_GATT_INVALID_ATTR_LEN;
@@ -722,7 +717,7 @@ wiced_bt_gatt_status_t ex07_low_power_sds_connect_callback( wiced_bt_gatt_connec
             connection_id = 0;
             memset( hostinfo.bdaddr, 0, sizeof(BD_ADDR));
             /* Reset the CCCD value so that on a reconnect CCCD will be off */
-            ex07_low_power_sds_wiced101_buttons_cccd[0] = 0;
+            ex07_low_power_sds_wiced101_button_cccd[0] = 0;
 
             /* restart the advertisements */
             wiced_bt_start_advertisements(BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL);
@@ -832,85 +827,62 @@ void ex07_low_power_sds_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t
 #endif
 
 
-/* Thread function to read button values from PSoC */
-void i2c_read( uint32_t arg )
+/* Interrupt callback function for BUTTON_1 */
+void button_cback( void *data, uint8_t port_pin )
 {
-    /* Thread will delay so that button values are read every 100ms */
-    #define THREAD_DELAY_IN_MS          (100)
+    /* Clear the GPIO interrupt (this is not strictly needed since it is done automatically for buttons) */
+    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
 
-    /* I2C address and register locations inside the PSoC and a mask for just CapSense buttons */
-    #define I2C_ADDRESS        (0x42)
-    #define BUTTON_REG         (0x06)
-    #define CAPSENSE_MASK      (0x0F)
+    /* Save button state in the GATT array */
+    ex07_low_power_sds_wiced101_button[0] = !wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 );
 
-    char i2cReg;               // I2C Read register
-    char buttonVal;            // Button value
-
-    /* Configure I2C block */
-    wiced_hal_i2c_init();
-    wiced_hal_i2c_set_speed( I2CM_SPEED_400KHZ );
-
-    /* Write the offset to allow reading of the button register */
-    i2cReg = BUTTON_REG;
-    wiced_hal_i2c_write( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-
-    for(;;)
+    /* Send notification if there is a connection and notifications are enabled */
+    if ( connection_id != 0)
     {
-        /* Read button values and mask out just the CapSense buttons */
-        wiced_hal_i2c_read( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-        buttonVal = i2cReg & CAPSENSE_MASK;
-
-        if(prevVal != buttonVal) /* Only print if value has changed since last time */
+         if(ex07_low_power_sds_wiced101_button_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
         {
-            WICED_BT_TRACE( "Button State: %02X\n\r", buttonVal);
-            ex07_low_power_sds_wiced101_buttons[2] = buttonVal;
-            /* If the connection is up and if the client wants notifications, send it */
-            if ( connection_id != 0)
-            {
-                 if(ex07_low_power_sds_wiced101_buttons_cccd[0] & GATT_CLIENT_CONFIG_NOTIFICATION)
-                {
-                    wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTONS_VALUE, sizeof(ex07_low_power_sds_wiced101_buttons), ex07_low_power_sds_wiced101_buttons );
-                    WICED_BT_TRACE( "\tSend Notification: sending CapSense value\r\n");
-                }
-            }
-            prevVal = buttonVal;
+            wiced_bt_gatt_send_notification(connection_id, HDLC_WICED101_BUTTON_VALUE, sizeof(ex07_low_power_sds_wiced101_button), ex07_low_power_sds_wiced101_button );
+            WICED_BT_TRACE( "\tSend Notification: sending Button value %d\r\n", ex07_low_power_sds_wiced101_button[0]);
         }
-
-        /* Send the thread to sleep for a period of time */
-        wiced_rtos_delay_milliseconds( THREAD_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
-
     }
 }
 
-/* Interrupt callback function for BUTTON_1  - remove existing bonding info and put into bonding mode */
-void button_cback( void *data, uint8_t port_pin )
+
+/* Interrupt callback function for UART */
+void rx_cback( void *data )
 {
+    uint8_t  readbyte;
     wiced_result_t                  result;
     wiced_bt_device_link_keys_t     link_keys;
     wiced_bt_local_identity_keys_t  local_keys;
     BD_ADDR                         bonded_address;
 
-    /* Put into bonding mode  */
-    bond_mode = WICED_TRUE;
+    /* Read one byte from the buffer and (unlike GPIO) reset the interrupt */
+    wiced_hal_puart_read( &readbyte );
+    wiced_hal_puart_reset_puart_interrupt();
 
-    /* Remove from the bonded device list */
-    wiced_hal_read_nvram( WICED_NVRAM_VSID_START, sizeof(bonded_address), (uint8_t*)&bonded_address, &result );
-    wiced_bt_dev_delete_bonded_device(bonded_address);
-    WICED_BT_TRACE( "Remove host %B from bonded device list \n\r", bonded_address );
-    WICED_BT_TRACE( "Bonding information removed\n\r" );
+    /* Remove bonding info if the user sends 'e' */
+    if( readbyte == 'e' )
+    {
+            /* Put into bonding mode  */
+            bond_mode = WICED_TRUE;
 
-    /* Remove device from address resolution database */
-    wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS, sizeof(wiced_bt_device_link_keys_t), (uint8_t*)&link_keys, &result);
-    wiced_bt_dev_remove_device_from_address_resolution_db ( &link_keys );
+            /* Remove from the bonded device list */
+            wiced_hal_read_nvram( WICED_NVRAM_VSID_START, sizeof(bonded_address), (uint8_t*)&bonded_address, &result );
+            wiced_bt_dev_delete_bonded_device(bonded_address);
+            WICED_BT_TRACE( "Remove host %B from bonded device list \n\r", bonded_address );
+            WICED_BT_TRACE( "Bonding information removed\n\r" );
 
-    /* Remove bonding information from NVRAM */
-    memset( &hostinfo, 0, sizeof(hostinfo));
-    memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
-    wiced_hal_write_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
-    wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS, sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
+            /* Remove device from address resolution database */
+            wiced_hal_read_nvram( WICED_NVRAM_PAIRED_KEYS, sizeof(wiced_bt_device_link_keys_t), (uint8_t*)&link_keys, &result);
+            wiced_bt_dev_remove_device_from_address_resolution_db ( &link_keys );
 
-    /* Clear the GPIO interrupt */
-    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
+            /* Remove bonding information from NVRAM */
+            memset( &hostinfo, 0, sizeof(hostinfo));
+            memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
+            wiced_hal_write_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
+            wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS, sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
+    }
 }
 
 /* Sleep callback function */

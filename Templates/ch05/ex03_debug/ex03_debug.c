@@ -5,9 +5,6 @@
 #include "sparcommon.h"
 #include "wiced_bt_stack.h"
 #include "wiced_rtos.h"
-#include "spar_utils.h"
-#include "wiced_hal_wdog.h"
-#include "tx_port.h"
 
 /*****************************    Constants   *****************************/
 /* Thread will delay for 250ms so that LED frequency will be 500ms = 2 Hz */
@@ -34,10 +31,6 @@ void led_control( uint32_t arg );
 APPLICATION_START( )
 {
     /* Debugging setup */
-    #ifdef DEBUG
-    SETUP_APP_FOR_DEBUG_IF_DEBUG_ENABLED();
-    BUSY_WAIT_TILL_MANUAL_CONTINUE_IF_DEBUG_ENABLED();
-    #endif
 
     wiced_bt_stack_init( bt_cback, NULL, NULL );                    // Register BT stack callback
 }

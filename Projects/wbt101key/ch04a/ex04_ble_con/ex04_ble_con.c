@@ -29,8 +29,6 @@
 #include "wiced_hal_pspi.h"
 #include "ex04_ble_con_db.h"
 #include "wiced_bt_cfg.h"
-#include "wiced_rtos.h"
-#include "wiced_hal_i2c.h"
 #include "wiced_timer.h"
 
 /*******************************************************************
@@ -41,16 +39,8 @@
 
 #define BLINK_RATE (500)
 
-#define LED_ON  (1)
-#define LED_OFF (0)
-
-/* Useful macros for thread priorities */
-#define PRIORITY_HIGH               (3)
-#define PRIORITY_MEDIUM             (5)
-#define PRIORITY_LOW                (7)
-
-/* Sensible stack size for most threads */
-#define THREAD_STACK_MIN_SIZE       (500)
+#define LED_ON  (0)
+#define LED_OFF (1)
 
 /*******************************************************************
  * Variable Definitions
@@ -62,8 +52,6 @@ static wiced_transport_buffer_pool_t* transport_pool = NULL;
 
 wiced_timer_t ledBlinkTimer;
 uint16_t connection_id = 0;
-
-wiced_thread_t * i2c_thread;
 
 /*******************************************************************
  * Function Prototypes
@@ -85,7 +73,7 @@ static void                   ex04_ble_con_trace_callback         ( wiced_bt_hci
 #endif
 
 void ledBlinkCallback(uint32_t arg);
-void i2c_read( uint32_t arg );
+void button_cback( void *data, uint8_t port_pin );
 
 /*******************************************************************
  * Macro Definitions
@@ -119,7 +107,7 @@ wiced_transport_cfg_t transport_cfg =
 uint8_t ex04_ble_con_generic_access_device_name[] = {'k','e','y','_','c','o','n'};
 uint8_t ex04_ble_con_generic_access_appearance[]  = {0x00,0x00};
 uint8_t ex04_ble_con_wiced101_led[]               = {0x00};
-uint8_t ex04_ble_con_wiced101_buttons[]           = {0x04,0x00,0x00};
+uint8_t ex04_ble_con_wiced101_button[]            = {0x00};
 
 /*******************************************************************
  * GATT Lookup Table
@@ -130,10 +118,10 @@ uint8_t ex04_ble_con_wiced101_buttons[]           = {0x04,0x00,0x00};
 gatt_db_lookup_table ex04_ble_con_gatt_db_ext_attr_tbl[] =
 {
     /* { attribute handle,                  maxlen, curlen, attribute data } */
-    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE, 12,     12,     ex04_ble_con_generic_access_device_name},
+    {HDLC_GENERIC_ACCESS_DEVICE_NAME_VALUE, 7,      7,     ex04_ble_con_generic_access_device_name},
     {HDLC_GENERIC_ACCESS_APPEARANCE_VALUE,  2,      2,      ex04_ble_con_generic_access_appearance},
     {HDLC_WICED101_LED_VALUE,               1,      1,      ex04_ble_con_wiced101_led},
-    {HDLC_WICED101_BUTTONS_VALUE,           3,      3,      ex04_ble_con_wiced101_buttons},
+    {HDLC_WICED101_BUTTON_VALUE,            1,      1,      ex04_ble_con_wiced101_button},
 };
 
 // Number of Lookup Table Entries
@@ -179,16 +167,6 @@ void ex04_ble_con_app_init(void)
     /* Initialize Application */
     wiced_bt_app_init();
 
-    /* Start a thread to read button values */
-    i2c_thread = wiced_rtos_create_thread();       // Get memory for the thread handle
-    wiced_rtos_init_thread(
-            i2c_thread,                  // Thread handle
-            PRIORITY_MEDIUM,                // Priority
-            "Buttons",                      // Name
-            i2c_read,                    // Function
-            THREAD_STACK_MIN_SIZE,          // Stack
-            NULL );                         // Function argument
-
     /* Allow peer to pair */
     wiced_bt_set_pairable_mode(WICED_FALSE, 0);
 
@@ -204,6 +182,10 @@ void ex04_ble_con_app_init(void)
     /* Initialize timer that will blink LED during advertising */
     wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
     wiced_start_timer(&ledBlinkTimer, BLINK_RATE);
+
+    /* Configure the Button GPIO as an input with a resistive pull up and interrupt on falling edge */
+     wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
+     wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_BOTH_EDGE ), GPIO_PIN_OUTPUT_HIGH );
 
     /* Start Undirected LE Advertisements on device startup.
      * The corresponding parameters are contained in 'wiced_bt_cfg.c' */
@@ -398,7 +380,7 @@ wiced_bt_gatt_status_t ex04_ble_con_get_value( uint16_t attr_handle, uint16_t co
                     break;
                 case HDLC_WICED101_LED_VALUE:
                     break;
-                case HDLC_WICED101_BUTTONS_VALUE:
+                case HDLC_WICED101_BUTTON_VALUE:
                     break;
                 }
             }
@@ -460,8 +442,8 @@ wiced_bt_gatt_status_t ex04_ble_con_set_value( uint16_t attr_handle, uint16_t co
                 {
                 case HDLC_WICED101_LED_VALUE:
                     /* Turn the LED on/off depending on the value written to the GATT database */
+                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, !ex04_ble_con_wiced101_led[0]);
                     WICED_BT_TRACE("Output = %d\n", ex04_ble_con_wiced101_led[0]);
-                    wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_2, ex04_ble_con_wiced101_led[0]);
                     break;
                 }
             }
@@ -651,43 +633,11 @@ void ledBlinkCallback(uint32_t arg)
     }
 }
 
-/* Thread function to read button values from PSoC */
-void i2c_read( uint32_t arg )
+/* Interrupt callback function for BUTTON_1 */
+void button_cback( void *data, uint8_t port_pin )
 {
-    /* Thread will delay so that button values are read every 100ms */
-    #define THREAD_DELAY_IN_MS          (100)
+    /* Clear the GPIO interrupt (this is not strictly needed since it is done automatically for buttons) */
+    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
 
-    /* I2C address and register locations inside the PSoC and a mask for just CapSense buttons */
-    #define I2C_ADDRESS        (0x42)
-    #define BUTTON_REG         (0x06)
-    #define CAPSENSE_MASK      (0x0F)
-
-    char i2cReg;               // I2C Read register
-    char buttonVal;            // Button value
-    char prevVal = 0x00;       // Previous button value
-
-    /* Configure I2C block */
-    wiced_hal_i2c_init();
-    wiced_hal_i2c_set_speed( I2CM_SPEED_400KHZ );
-
-    /* Write the offset to allow reading of the button register */
-    i2cReg = BUTTON_REG;
-    wiced_hal_i2c_write( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-
-    for(;;)
-    {
-        /* Read button values and mask out just the CapSense buttons */
-        wiced_hal_i2c_read( &i2cReg , sizeof( i2cReg ), I2C_ADDRESS );
-        buttonVal = i2cReg & CAPSENSE_MASK;
-
-        if(prevVal != buttonVal) /* Only print if value has changed since last time */
-        {
-            WICED_BT_TRACE( "Button State: %02X\n\r", buttonVal);
-            ex04_ble_con_wiced101_buttons[2] = buttonVal;
-        }
-        prevVal = buttonVal;
-
-        /* Send the thread to sleep for a period of time */
-        wiced_rtos_delay_milliseconds( THREAD_DELAY_IN_MS, ALLOW_THREAD_TO_SLEEP );
-    }
+    ex04_ble_con_wiced101_button[0] = !wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 );
 }

@@ -89,7 +89,7 @@ void led_control( uint32_t arg )
         wiced_rtos_get_semaphore(button_semaphore, WICED_WAIT_FOREVER);
 
         /* Read current set value for the LED pin and invert it */
-        led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 );
-        wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, ! led );
+        led = wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_2 );
+        wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, ! led );
     }
 }

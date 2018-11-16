@@ -54,7 +54,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
 
         .low_duty_scan_interval =           WICED_BT_CFG_DEFAULT_LOW_DUTY_SCAN_INTERVAL,                /**< Low Duty Scan Interval */
         .low_duty_scan_window =             WICED_BT_CFG_DEFAULT_LOW_DUTY_SCAN_WINDOW,                  /**< Low Duty Scan Window */
-        .low_duty_scan_duration =           60,                                                          /**< Low Duty Scan Duration in seconds (0 for infinite) */
+        .low_duty_scan_duration =           5,                                                          /**< Low Duty Scan Duration in seconds (0 for infinite) */
 
         /* Connection Scan Configuration */
         .high_duty_conn_scan_interval =     WICED_BT_CFG_DEFAULT_HIGH_DUTY_CONN_SCAN_INTERVAL,          /**< High Duty Connection Cycle Connection Scan Interval */
@@ -108,7 +108,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
         .client_max_links =                 1,                                                          /**< Client Config: Maximum number of servers that local client can connect to */
         .server_max_links =                 1,                                                          /**< Server Config: Maximum number of remote client connections allowed by local server */
         .max_attr_len =                     512,                                                        /**< Maximum attribute length; wiced_bt_cfg must have a corresponding buffer pool that can hold this length */
-        .max_mtu_size =                     517,                                                        /**< Maximum MTU size for GATT connections, should be between 23 and (max_attr_len + 5) */
+        .max_mtu_size =                     515,                                                        /**< Maximum MTU size for GATT connections, should be between 23 and (max_attr_len + 5) */
     },
 
     /* RFCOMM Configuration */
@@ -142,7 +142,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
     /* LE Address Resolution Database Settings */
     .addr_resolution_db_size =              10,                                                         /**< LE Address Resolution Database Size - Effective only for pre-4.2 controller */
     .max_number_of_buffer_pools =           4,                                                          /**< Maximum number of buffer pools in p_btm_cfg_buf_pools and by wiced_create_pool */
-    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,         /**< Interval of random address refreshing - secs */
+    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,           /**< Interval of random address refreshing - secs */
 };
 
 /*******************************************************************
