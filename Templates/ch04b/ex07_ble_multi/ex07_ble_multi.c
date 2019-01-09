@@ -292,7 +292,7 @@ void ex07_ble_multi_set_advertisement_data( void )
     adv_elem[num_elem].p_data = BT_LOCAL_NAME;
     num_elem++;
 
-    /* Advertisement Element for CapSense Service */
+    /* Advertisement Element for Wiced101 Service */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_128SERVICE_DATA;
     adv_elem[num_elem].len = LEN_UUID_128;
     adv_elem[num_elem].p_data = wiced101_service_uuid;

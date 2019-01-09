@@ -80,11 +80,11 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
 
         .high_duty_min_interval =           WICED_BT_CFG_DEFAULT_HIGH_DUTY_ADV_MIN_INTERVAL,            /**< High Duty Undirected Connectable Minimum Advertising Interval */
         .high_duty_max_interval =           WICED_BT_CFG_DEFAULT_HIGH_DUTY_ADV_MAX_INTERVAL,            /**< High Duty Undirected Connectable Maximum Advertising Interval */
-        .high_duty_duration =               30,                                                         /**< High Duty Undirected Connectable Advertising Duration in seconds (0 for infinite) */
+        .high_duty_duration =               20,                                                         /**< High Duty Undirected Connectable Advertising Duration in seconds (0 for infinite) */
 
         .low_duty_min_interval =            WICED_BT_CFG_DEFAULT_LOW_DUTY_ADV_MIN_INTERVAL,             /**< Low Duty Undirected Connectable Minimum Advertising Interval */
         .low_duty_max_interval =            WICED_BT_CFG_DEFAULT_LOW_DUTY_ADV_MAX_INTERVAL,             /**< Low Duty Undirected Connectable Maximum Advertising Interval */
-        .low_duty_duration =                60,                                                         /**< Low Duty Undirected Connectable Advertising Duration in seconds (0 for infinite) */
+        .low_duty_duration =                0,                                                         /**< Low Duty Undirected Connectable Advertising Duration in seconds (0 for infinite) */
 
         .high_duty_directed_min_interval =  WICED_BT_CFG_DEFAULT_HIGH_DUTY_DIRECTED_ADV_MIN_INTERVAL,   /**< High Duty Directed Minimum Advertising Interval */
         .high_duty_directed_max_interval =  WICED_BT_CFG_DEFAULT_HIGH_DUTY_DIRECTED_ADV_MAX_INTERVAL,   /**< High Duty Directed Maximum Advertising Interval */
@@ -142,7 +142,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
     /* LE Address Resolution Database Settings */
     .addr_resolution_db_size =              10,                                                         /**< LE Address Resolution Database Size - Effective only for pre-4.2 controller */
     .max_number_of_buffer_pools =           4,                                                          /**< Maximum number of buffer pools in p_btm_cfg_buf_pools and by wiced_create_pool */
-    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_CHANGE_TIMEOUT,         /**< Interval of random address refreshing - secs */
+    .rpa_refresh_timeout =                  WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,         /**< Interval of random address refreshing - secs */
 };
 
 /*******************************************************************

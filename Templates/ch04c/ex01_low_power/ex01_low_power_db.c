@@ -40,7 +40,7 @@ const uint8_t gatt_database[] = // Define GATT database
                 __UUID_WICED101_LED, LEGATTDB_CHAR_PROP_READ | LEGATTDB_CHAR_PROP_WRITE,
                 LEGATTDB_PERM_READABLE | LEGATTDB_PERM_WRITE_REQ),
 
-            /* Characteristic 'Buttons' */
+            /* Characteristic 'Button' */
             CHARACTERISTIC_UUID128 (HDLC_WICED101_BUTTON, HDLC_WICED101_BUTTON_VALUE,
                 __UUID_WICED101_BUTTON, LEGATTDB_CHAR_PROP_READ | LEGATTDB_CHAR_PROP_NOTIFY,
                 LEGATTDB_PERM_READABLE | LEGATTDB_PERM_AUTH_READABLE),

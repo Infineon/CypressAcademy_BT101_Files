@@ -29,17 +29,15 @@
 #include "wiced_hal_pspi.h"
 #include "ex01_low_power_db.h"
 #include "wiced_bt_cfg.h"
-#include "wiced_timer.h"
 #include "wiced_hal_puart.h"
+#include "wiced_sleep.h"
+#include "wiced_bt_l2c.h"
 
 /*******************************************************************
  * Constant Definitions
  ******************************************************************/
 #define TRANS_UART_BUFFER_SIZE  1024
 #define TRANS_UART_BUFFER_COUNT 2
-
-#define BONDED_BLINK_RATE  (100)
-#define BONDING_BLINK_RATE (500)
 
 #define LED_ON  (0)
 #define LED_OFF (1)
@@ -56,7 +54,6 @@ extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
 
-wiced_timer_t ledBlinkTimer;
 uint16_t connection_id = 0;
 
 wiced_bool_t bond_mode = WICED_TRUE; // If true we will go into bonding mode. This will be set false if pre-existing bonding info is available
@@ -67,6 +64,8 @@ struct
     BD_ADDR   bdaddr;                               /* BD address of the bonded host so we know if we reconnected to the same device */
     uint16_t  cccd;  /* Remember the value of the CCCD (whether notifications were on or off last time we were connected) */
 } __attribute__((packed)) hostinfo;
+
+wiced_sleep_config_t sleep_config;
 
 /*******************************************************************
  * Function Prototypes
@@ -86,9 +85,9 @@ static uint32_t               hci_control_process_rx_cmd          ( uint8_t* p_d
 #ifdef HCI_TRACE_OVER_TRANSPORT
 static void                   ex01_low_power_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
 #endif
-void ledBlinkCallback(uint32_t arg);
 void button_cback( void *data, uint8_t port_pin );
 void rx_cback( void *data );
+uint32_t low_power_sleep_callback(wiced_sleep_poll_type_t type );
 
 /*******************************************************************
  * Macro Definitions
@@ -174,6 +173,19 @@ void application_start(void)
 
     /* Initialize Bluetooth Controller and Host Stack */
     wiced_bt_stack_init(ex01_low_power_management_callback, &wiced_bt_cfg_settings, wiced_bt_cfg_buf_pools);
+
+    /* Configure and initialize sleep */
+     sleep_config.sleep_mode             = WICED_SLEEP_MODE_NO_TRANSPORT;
+     sleep_config.device_wake_mode       = WICED_SLEEP_WAKE_ACTIVE_LOW;
+     sleep_config.device_wake_source     = WICED_SLEEP_WAKE_SOURCE_GPIO;
+     sleep_config.device_wake_gpio_num   = WICED_GPIO_PIN_BUTTON_1;
+     sleep_config.host_wake_mode         = WICED_SLEEP_WAKE_ACTIVE_LOW;
+     sleep_config.sleep_permit_handler   = low_power_sleep_callback;
+
+     if(WICED_BT_SUCCESS != wiced_sleep_configure(&sleep_config))
+     {
+         WICED_BT_TRACE("Sleep Configure failed!\n\r");
+     }
 }
 
 /*
@@ -212,10 +224,6 @@ void ex01_low_power_app_init(void)
 
     /* Initialize GATT Database */
     wiced_bt_gatt_db_init( gatt_database, gatt_database_len );
-
-    /* Initialize timer that will blink LED during advertising - speed depends on if we are bonded or not */
-    wiced_init_timer(&ledBlinkTimer, ledBlinkCallback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER);
-    wiced_start_timer(&ledBlinkTimer, bond_mode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
 
     /* Configure the Button GPIO as an input with a resistive pull up and interrupt on rising edge */
     wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, NULL );
@@ -273,14 +281,6 @@ void ex01_low_power_advertisement_stopped( void )
     WICED_BT_TRACE("Advertisement stopped\n");
 
     /* TODO: Handle when advertisements stop */
-    if(0 == connection_id) /* Not connected */
-    {
-        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_OFF);
-    }
-    else
-    {
-        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, LED_ON);
-    }
 }
 
 /* TODO: This function should be called when the device needs to be reset */
@@ -630,6 +630,9 @@ wiced_bt_gatt_status_t ex01_low_power_connect_callback( wiced_bt_gatt_connection
 
             /* Copy address of connected device to the hostinfo structure to be saved in NVRAM when pairing is complete */
             memcpy(hostinfo.bdaddr, p_conn_status->bd_addr, sizeof(BD_ADDR));
+
+            /* Update connection parameters */
+            wiced_bt_l2cap_update_ble_conn_params( p_conn_status->bd_addr, 200, 200, 3, 512 );
         }
         else
         {
@@ -643,9 +646,6 @@ wiced_bt_gatt_status_t ex01_low_power_connect_callback( wiced_bt_gatt_connection
             /* Reset the CCCD value so that on a reconnect CCCD will be off */
             ex01_low_power_wiced101_button_cccd[0] = 0;
 
-            /* set timer to correct speed depending on bond_mode and restart the advertisements */
-            wiced_stop_timer(&ledBlinkTimer);
-            wiced_start_timer(&ledBlinkTimer, bond_mode ? BONDING_BLINK_RATE : BONDED_BLINK_RATE);
             wiced_bt_start_advertisements(BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL);
         }
         status = WICED_BT_GATT_SUCCESS;
@@ -751,15 +751,6 @@ void ex01_low_power_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t len
 }
 #endif
 
-/* Invert LED state when the timer expires if we are advertising to cause the LED to blink */
-void ledBlinkCallback(uint32_t arg)
-{
-    if(0 != wiced_bt_ble_get_current_advert_mode()) /* Advertising */
-    {
-        wiced_hal_gpio_set_pin_output(WICED_GPIO_PIN_LED_1, !wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ));
-    }
-}
-
 
 /* Interrupt callback function for BUTTON_1 */
 void button_cback( void *data, uint8_t port_pin )
@@ -816,11 +807,26 @@ void rx_cback( void *data )
             memset( &link_keys, 0, sizeof(wiced_bt_device_link_keys_t));
             wiced_hal_write_nvram( WICED_NVRAM_VSID_START, sizeof(hostinfo), (uint8_t*)&hostinfo, &result );
             wiced_hal_write_nvram ( WICED_NVRAM_PAIRED_KEYS, sizeof( wiced_bt_device_link_keys_t ), (uint8_t*)&link_keys, &result );
-
-            /* Restart timer with correct speed */
-            wiced_stop_timer(&ledBlinkTimer);
-            wiced_start_timer(&ledBlinkTimer, BONDING_BLINK_RATE);
     }
 }
 
+/* Sleep callback function */
+uint32_t low_power_sleep_callback(wiced_sleep_poll_type_t type )
+{
+    uint32_t ret;
 
+    switch(type)
+    {
+        case WICED_SLEEP_POLL_SLEEP_PERMISSION:
+            /* Always allow PDS */
+            ret = WICED_SLEEP_ALLOWED_WITHOUT_SHUTDOWN;
+            WICED_BT_TRACE( "$" ); //Print $ when sleep is requested
+            break;
+        case WICED_SLEEP_POLL_TIME_TO_SLEEP:
+            /* Always allow max sleep time */
+            ret = WICED_SLEEP_MAX_TIME_TO_SLEEP;
+            WICED_BT_TRACE( "e" ); //Print e when sleep is entered
+            break;
+    }
+    return ret;
+}

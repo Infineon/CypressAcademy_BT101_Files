@@ -179,7 +179,7 @@ void application_start(void)
      sleep_config.device_wake_mode       = WICED_SLEEP_WAKE_ACTIVE_LOW;
      sleep_config.device_wake_source     = WICED_SLEEP_WAKE_SOURCE_GPIO;
      sleep_config.device_wake_gpio_num   = WICED_GPIO_PIN_BUTTON_1;
-     sleep_config.host_wake_mode         = WICED_SLEEP_WAKE_ACTIVE_HIGH;
+     sleep_config.host_wake_mode         = WICED_SLEEP_WAKE_ACTIVE_LOW;
      sleep_config.sleep_permit_handler   = low_power_sleep_callback;
 
      if(WICED_BT_SUCCESS != wiced_sleep_configure(&sleep_config))
@@ -630,6 +630,9 @@ wiced_bt_gatt_status_t ex01_low_power_connect_callback( wiced_bt_gatt_connection
 
             /* Copy address of connected device to the hostinfo structure to be saved in NVRAM when pairing is complete */
             memcpy(hostinfo.bdaddr, p_conn_status->bd_addr, sizeof(BD_ADDR));
+
+            /* Update connection parameters */
+            wiced_bt_l2cap_update_ble_conn_params( p_conn_status->bd_addr, 200, 200, 3, 512 );
         }
         else
         {
@@ -817,7 +820,7 @@ uint32_t low_power_sleep_callback(wiced_sleep_poll_type_t type )
         case WICED_SLEEP_POLL_SLEEP_PERMISSION:
             /* Always allow PDS */
             ret = WICED_SLEEP_ALLOWED_WITHOUT_SHUTDOWN;
-            WICED_BT_TRACE( "$" ); //Print . when sleep is requested
+            WICED_BT_TRACE( "$" ); //Print $ when sleep is requested
             break;
         case WICED_SLEEP_POLL_TIME_TO_SLEEP:
             /* Always allow max sleep time */

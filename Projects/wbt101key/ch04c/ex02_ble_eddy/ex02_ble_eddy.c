@@ -4,7 +4,7 @@
  *
  */
 
-/** ex04_ble_eddy_multi.c
+/** ex02_ble_eddy.c
  *
  */
 
@@ -26,7 +26,7 @@
 #include "wiced_bt_stack.h"
 #include "wiced_bt_app_common.h"
 #include "wiced_hal_wdog.h"
-#include "wiced_timer.h"
+
 
 /*******************************************************************
  * Constant Definitions
@@ -34,78 +34,26 @@
 #define TRANS_UART_BUFFER_SIZE  1024
 #define TRANS_UART_BUFFER_COUNT 2
 
-#define EDDY_UUID_LSB   0xAA
-#define EDDY_UUID_MSB   0xFE
-#define EDDY_UID_FIELD  0x00
-#define EDDY_URL_FIELD  0x10
-#define EDDY_TLM_FIELD  0x20
-#define EDDY_HTTPS_WWW  0x01
-#define TX_PWR          0xF0
-
-#define UPTIME_OFFSET   12
-
 /*******************************************************************
  * Variable Definitions
  ******************************************************************/
 extern const wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 extern const wiced_bt_cfg_buf_pool_t wiced_bt_cfg_buf_pools[WICED_BT_CFG_NUM_BUF_POOLS];
-// Local Device Name in device configuration
-extern uint8_t BT_LOCAL_NAME[];
 // Transport pool for sending RFCOMM data to host
 static wiced_transport_buffer_pool_t* transport_pool = NULL;
-
-/* TThis is how long the device has been powered up in units of 0.1 second. */
-uint32_t upTime = 0;
-
-// Constants used in advertising packets
-const uint8_t  adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
-const uint8_t eddyURL[] = {
-         EDDY_UUID_LSB,
-         EDDY_UUID_MSB,
-         EDDY_URL_FIELD,
-         TX_PWR,
-         EDDY_HTTPS_WWW,
-         'g','o','o','.','g','l','/','d','f','h','s','4','w'
-         };
-const uint8_t eddyUID[] = {
-        EDDY_UUID_LSB,
-        EDDY_UUID_MSB,
-        EDDY_UID_FIELD,
-        TX_PWR,
-        'k','e','y','n','a','m','e',' ',' ',' ','k','e','y','i','n','s',
-        0x00,
-        0x00
-        };
-      uint8_t eddyTLM[] = {
-              EDDY_UUID_LSB,
-              EDDY_UUID_MSB,
-              EDDY_TLM_FIELD,
-              0x00,                   // Version
-              0x00, 0x00,             // Battery Voltage
-              0x80, 0x00,             // Temperature
-              0x00, 0x00, 0x00, 0x00, //Advertising PDU count
-              0x00, 0x00, 0x00, 0x00  //Time since reboot
-      };
-
-wiced_timer_t tlm_timer;
-
 
 /*******************************************************************
  * Function Prototypes
  ******************************************************************/
-static void                  ex04_ble_eddy_multi_app_init               ( void );
-static wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback    ( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
-static void                  ex04_ble_eddy_multi_set_advertisement_data_url ( void );
-static void                  ex04_ble_eddy_multi_set_advertisement_data_uid ( void );
-static void                  ex04_ble_eddy_multi_set_advertisement_data_tlm ( void );
-static void                  ex04_ble_eddy_multi_advertisement_stopped  ( void );
-static void                  ex04_ble_eddy_multi_reset_device           ( void );
+static void                  ex02_ble_eddy_app_init               ( void );
+static wiced_bt_dev_status_t ex02_ble_eddy_management_callback    ( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
+static void                  ex02_ble_eddy_set_advertisement_data ( void );
+static void                  ex02_ble_eddy_advertisement_stopped  ( void );
+static void                  ex02_ble_eddy_reset_device           ( void );
 static uint32_t              hci_control_process_rx_cmd          ( uint8_t* p_data, uint32_t len );
 #ifdef HCI_TRACE_OVER_TRANSPORT
-static void                  ex04_ble_eddy_multi_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
+static void                  ex02_ble_eddy_trace_callback         ( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data );
 #endif
-
-void tlm_timer_callback( uint32_t arg );
 
 /*******************************************************************
  * Macro Definitions
@@ -113,17 +61,6 @@ void tlm_timer_callback( uint32_t arg );
 // Macro to extract uint16_t from little-endian byte array
 #define LITTLE_ENDIAN_BYTE_ARRAY_TO_UINT16(byte_array) \
         (uint16_t)( ((byte_array)[0] | ((byte_array)[1] << 8)) )
-
-/*  adv_instance numbers for each frame type */
-#define EDDYSTONE_FRAME_TYPE_URL_MULT_INST 1
-#define EDDYSTONE_FRAME_TYPE_UID_MULT_INST 2
-#define EDDYSTONE_FRAME_TYPE_TLM_MULT_INST 3
-
-/* connection interval for each frame type */
-#define EDDYSTONE_INTERVAL_URL   100
-#define EDDYSTONE_INTERVAL_UID   200
-#define EDDYSTONE_INTERVAL_TLM   500
-
 
 /*******************************************************************
  * Transport Configuration
@@ -173,13 +110,13 @@ void application_start(void)
 #endif
 
     /* Initialize Bluetooth Controller and Host Stack */
-    wiced_bt_stack_init(ex04_ble_eddy_multi_management_callback, &wiced_bt_cfg_settings, wiced_bt_cfg_buf_pools);
+    wiced_bt_stack_init(ex02_ble_eddy_management_callback, &wiced_bt_cfg_settings, wiced_bt_cfg_buf_pools);
 }
 
 /*
  * This function is executed in the BTM_ENABLED_EVT management callback.
  */
-void ex04_ble_eddy_multi_app_init(void)
+void ex02_ble_eddy_app_init(void)
 {
     /* Initialize Application */
     wiced_bt_app_init();
@@ -187,138 +124,62 @@ void ex04_ble_eddy_multi_app_init(void)
     /* Allow peer to pair */
     wiced_bt_set_pairable_mode(WICED_TRUE, 0);
 
-
     /* Set Advertisement Data */
-    ex04_ble_eddy_multi_set_advertisement_data_url();
-    ex04_ble_eddy_multi_set_advertisement_data_uid();
+    ex02_ble_eddy_set_advertisement_data();
 
-    /* Start timer for TLM - this will update the TLM advertising data every second */
-    wiced_init_timer(&tlm_timer, tlm_timer_callback, 0, WICED_SECONDS_PERIODIC_TIMER);
-    wiced_start_timer(&tlm_timer, 1);
-
-    /* Start Undirected LE Advertisements on device startup. */
-    wiced_start_multi_advertisements(MULTI_ADVERT_START, EDDYSTONE_FRAME_TYPE_URL_MULT_INST);
-    wiced_start_multi_advertisements(MULTI_ADVERT_START, EDDYSTONE_FRAME_TYPE_UID_MULT_INST);
-    wiced_start_multi_advertisements(MULTI_ADVERT_START, EDDYSTONE_FRAME_TYPE_TLM_MULT_INST);
-
+    /* Start Undirected LE Advertisements on device startup.
+     * The corresponding parameters are contained in 'wiced_bt_cfg.c' */
+    /* TODO: Make sure that this is the desired behavior. */
+    wiced_bt_start_advertisements(BTM_BLE_ADVERT_NONCONN_HIGH, 0, NULL);
 }
 
-/* Set Advertisement Data for URL */
-void ex04_ble_eddy_multi_set_advertisement_data_url( void )
+/* Set Advertisement Data */
+void ex02_ble_eddy_set_advertisement_data( void )
 {
-    uint8_t advPacket[31];
-    uint8_t len = 0;
 
-    /* Flags */
-    advPacket[len++] = 2; // Field size is 2 (type + flag data)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_FLAG;
-    advPacket[len++] = adv_flag;
+#define EDDY_UUID_LSB   0xAA
+#define EDDY_UUID_MSB   0xFE
+#define EDDY_URL_FIELD  0x10
+#define EDDY_HTTPS_WWW  0x01
+#define TX_PWR          0xF0
 
-    /* 16-bit Service UUID */
-    advPacket[len++] = 3; // Field size is 3 (type + 2 byte UUID)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_16SRV_COMPLETE;
-    advPacket[len++] = EDDY_UUID_LSB;
-    advPacket[len++] = EDDY_UUID_MSB;
+    wiced_bt_ble_advert_elem_t adv_elem[3] = { 0 };
+    uint8_t  adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
+    uint8_t  eddySvcUUID[] = {EDDY_UUID_LSB, EDDY_UUID_MSB}; // UUID is little endian
+    uint8_t  eddyURL[] = {
+            EDDY_UUID_LSB,
+            EDDY_UUID_MSB,
+            EDDY_URL_FIELD,
+            TX_PWR,
+            EDDY_HTTPS_WWW,
+            'g','o','o','.','g','l','/','d','f','h','s','4','w'
+            };
+    uint8_t num_elem = 0; 
 
-    /* Service Data */
-    advPacket[len++] = 1+ sizeof(eddyURL);
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_SERVICE_DATA;
-    memcpy(&advPacket[len], eddyURL, sizeof(eddyURL));
-    len = len + sizeof(eddyURL);
+    /* Advertisement Element for Flags */
+    adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_FLAG;
+    adv_elem[num_elem].len = sizeof(uint8_t);
+    adv_elem[num_elem].p_data = &adv_flag;
+    num_elem++;
 
-    /* Set advertisement data */
-    wiced_set_multi_advertisement_data(advPacket, len, EDDYSTONE_FRAME_TYPE_URL_MULT_INST);
+    /* Advertisement Element for Service UUID */
+    adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_16SRV_COMPLETE ;
+    adv_elem[num_elem].len = sizeof(uint16_t);
+    adv_elem[num_elem].p_data = eddySvcUUID;
+    num_elem++;
 
-    /* Setup the advertisement parameters */
-    wiced_set_multi_advertisement_params(EDDYSTONE_INTERVAL_URL,
-            EDDYSTONE_INTERVAL_URL, MULTI_ADVERT_NONCONNECTABLE_EVENT,
-            BLE_ADDR_PUBLIC, NULL,
-            BLE_ADDR_PUBLIC, NULL,
-            BTM_BLE_ADVERT_CHNL_37,
-            BTM_BLE_ADVERT_FILTER_ALL_CONNECTION_REQ_ALL_SCAN_REQ,
-            EDDYSTONE_FRAME_TYPE_URL_MULT_INST, MULTI_ADV_TX_POWER_MAX);
-}
+    /* Advertisement Element for Service Data */
+    adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_SERVICE_DATA  ;
+    adv_elem[num_elem].len = sizeof(eddyURL);
+    adv_elem[num_elem].p_data = eddyURL;
+    num_elem++;
 
-/* Set Advertisement Data for URL */
-void ex04_ble_eddy_multi_set_advertisement_data_uid( void )
-{
-    uint8_t advPacket[31];
-    uint8_t len = 0;
-
-    /* Flags */
-    advPacket[len++] = 2; // Field size is 2 (type + flag data)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_FLAG;
-    advPacket[len++] = adv_flag;
-
-    /* 16-bit Service UUID */
-    advPacket[len++] = 3; // Field size is 3 (type + 2 byte UUID)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_16SRV_COMPLETE;
-    advPacket[len++] = EDDY_UUID_LSB;
-    advPacket[len++] = EDDY_UUID_MSB;
-
-    /* Service Data */
-    advPacket[len++] = 1+ sizeof(eddyUID);
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_SERVICE_DATA;
-    memcpy(&advPacket[len], eddyUID, sizeof(eddyUID));
-    len = len + sizeof(eddyUID);
-
-
-    /* Set advertisement data */
-    wiced_set_multi_advertisement_data(advPacket, len, EDDYSTONE_FRAME_TYPE_UID_MULT_INST);
-
-    /* Setup the advertisement parameters */
-    wiced_set_multi_advertisement_params(EDDYSTONE_INTERVAL_UID,
-            EDDYSTONE_INTERVAL_UID, MULTI_ADVERT_NONCONNECTABLE_EVENT,
-            BLE_ADDR_PUBLIC, NULL,
-            BLE_ADDR_PUBLIC, NULL,
-            BTM_BLE_ADVERT_CHNL_38,
-            BTM_BLE_ADVERT_FILTER_ALL_CONNECTION_REQ_ALL_SCAN_REQ,
-            EDDYSTONE_FRAME_TYPE_UID_MULT_INST, MULTI_ADV_TX_POWER_MAX);
-}
-
-/* Set Advertisement Data for TLM */
-void ex04_ble_eddy_multi_set_advertisement_data_tlm( void )
-{
-    uint8_t advPacket[31];
-    uint8_t len = 0;
-
-    /* Flags */
-    advPacket[len++] = 2; // Field size is 2 (type + flag data)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_FLAG;
-    advPacket[len++] = adv_flag;
-
-    /* 16-bit Service UUID */
-    advPacket[len++] = 3; // Field size is 3 (type + 2 byte UUID)
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_16SRV_COMPLETE;
-    advPacket[len++] = EDDY_UUID_LSB;
-    advPacket[len++] = EDDY_UUID_MSB;
-
-    /* Update uptime in the packet array - need to swap endiannes */
-    eddyTLM[UPTIME_OFFSET] =   (upTime >> 24) & 0xFF;
-    eddyTLM[UPTIME_OFFSET+1] = (upTime >> 16) & 0xFF;
-    eddyTLM[UPTIME_OFFSET+2] = (upTime >>  8) & 0xFF;
-    eddyTLM[UPTIME_OFFSET+3] = (upTime >>  0) & 0xFF;
-
-    advPacket[len++] = 1 + sizeof(eddyTLM);
-    advPacket[len++] = BTM_BLE_ADVERT_TYPE_SERVICE_DATA;
-    memcpy(&advPacket[len], eddyTLM, sizeof(eddyTLM));
-    len = len + sizeof(eddyTLM);
-
-    /* Set advertisement data */
-    wiced_set_multi_advertisement_data(advPacket, len, EDDYSTONE_FRAME_TYPE_TLM_MULT_INST);
-
-    /* Setup the advertisement parameters */
-    wiced_set_multi_advertisement_params(EDDYSTONE_INTERVAL_TLM,
-            EDDYSTONE_INTERVAL_TLM, MULTI_ADVERT_NONCONNECTABLE_EVENT,
-            BLE_ADDR_PUBLIC, NULL,
-            BLE_ADDR_PUBLIC, NULL,
-            BTM_BLE_ADVERT_CHNL_39,
-            BTM_BLE_ADVERT_FILTER_ALL_CONNECTION_REQ_ALL_SCAN_REQ,
-            EDDYSTONE_FRAME_TYPE_TLM_MULT_INST, MULTI_ADV_TX_POWER_MAX);
+    /* Set Raw Advertisement Data */
+    wiced_bt_ble_set_raw_advertisement_data(num_elem, adv_elem);
 }
 
 /* This function is invoked when advertisements stop */
-void ex04_ble_eddy_multi_advertisement_stopped( void )
+void ex02_ble_eddy_advertisement_stopped( void )
 {
     WICED_BT_TRACE("Advertisement stopped\n");
 
@@ -326,7 +187,7 @@ void ex04_ble_eddy_multi_advertisement_stopped( void )
 }
 
 /* TODO: This function should be called when the device needs to be reset */
-void ex04_ble_eddy_multi_reset_device( void )
+void ex02_ble_eddy_reset_device( void )
 {
     /* TODO: Clear any additional persistent values used by the application from NVRAM */
 
@@ -335,7 +196,7 @@ void ex04_ble_eddy_multi_reset_device( void )
 }
 
 /* Bluetooth Management Event Handler */
-wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data )
+wiced_bt_dev_status_t ex02_ble_eddy_management_callback( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data )
 {
     wiced_bt_dev_status_t status = WICED_BT_SUCCESS;
     wiced_bt_device_address_t bda = { 0 };
@@ -351,7 +212,7 @@ wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback( wiced_bt_manageme
         // There is a virtual HCI interface between upper layers of the stack and
         // the controller portion of the chip with lower layers of the BT stack.
         // Register with the stack to receive all HCI commands, events and data.
-        wiced_bt_dev_register_hci_trace(ex04_ble_eddy_multi_trace_callback);
+        wiced_bt_dev_register_hci_trace(ex02_ble_eddy_trace_callback);
 #endif
 
         WICED_BT_TRACE("Bluetooth Enabled (%s)\n",
@@ -364,7 +225,7 @@ wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback( wiced_bt_manageme
             WICED_BT_TRACE("Local Bluetooth Address: [%B]\n", bda);
 
             /* Perform application-specific initialization */
-            ex04_ble_eddy_multi_app_init();
+            ex02_ble_eddy_app_init();
         }
         break;
     case BTM_DISABLED_EVT:
@@ -401,7 +262,7 @@ wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback( wiced_bt_manageme
         WICED_BT_TRACE("Paired Device Link Request Keys Event\n");
         /* Device/app-specific TODO: HANDLE PAIRED DEVICE LINK REQUEST KEY - retrieve from NVRAM, etc */
 #if 0
-        if (ex04_ble_eddy_multi_read_link_keys( &p_event_data->paired_device_link_keys_request ))
+        if (ex02_ble_eddy_read_link_keys( &p_event_data->paired_device_link_keys_request ))
         {
             WICED_BT_TRACE("Key Retrieval Success\n");
         }
@@ -419,7 +280,7 @@ wiced_bt_dev_status_t ex04_ble_eddy_multi_management_callback( wiced_bt_manageme
         WICED_BT_TRACE("Advertisement State Change: %d\n", *p_adv_mode);
         if ( BTM_BLE_ADVERT_OFF == *p_adv_mode )
         {
-            ex04_ble_eddy_multi_advertisement_stopped();
+            ex02_ble_eddy_advertisement_stopped();
         }
         break;
     case BTM_USER_CONFIRMATION_REQUEST_EVT:
@@ -482,14 +343,8 @@ uint32_t hci_control_process_rx_cmd( uint8_t* p_data, uint32_t len )
 
 #ifdef HCI_TRACE_OVER_TRANSPORT
 /* Handle Sending of Trace over the Transport */
-void ex04_ble_eddy_multi_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data )
+void ex02_ble_eddy_trace_callback( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data )
 {
     wiced_transport_send_hci_trace( transport_pool, type, length, p_data );
 }
 #endif
-
-void tlm_timer_callback( uint32_t arg )
-{
-    upTime += 1;
-    ex04_ble_eddy_multi_set_advertisement_data_tlm();
-}

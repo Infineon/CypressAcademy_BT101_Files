@@ -5,7 +5,7 @@
  *
  */
 
-// ex02_ble_manu_db.h
+// ex04_ble_manu_db.h
 
 #ifndef __GATT_DATABASE_H__
 #define __GATT_DATABASE_H__
@@ -49,8 +49,8 @@ typedef struct
 // External definitions
 extern const uint8_t  gatt_database[];
 extern const uint16_t gatt_database_len;
-extern gatt_db_lookup_table ex02_ble_manu_gatt_db_ext_attr_tbl[];
-extern const uint16_t ex02_ble_manu_gatt_db_ext_attr_tbl_size;
+extern gatt_db_lookup_table ex04_ble_manu_gatt_db_ext_attr_tbl[];
+extern const uint16_t ex04_ble_manu_gatt_db_ext_attr_tbl_size;
 extern uint8_t BT_LOCAL_NAME[];
 extern const uint16_t BT_LOCAL_NAME_CAPACITY;
 

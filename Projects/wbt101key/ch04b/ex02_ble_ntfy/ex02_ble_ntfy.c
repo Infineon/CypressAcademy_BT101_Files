@@ -201,7 +201,7 @@ void ex02_ble_ntfy_set_advertisement_data( void )
     wiced_bt_ble_advert_elem_t adv_elem[3] = { 0 };
     uint8_t adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
     uint8_t num_elem = 0; 
-    uint8_t capsense_service_uuid[LEN_UUID_128] = { __UUID_WICED101 };
+    uint8_t wiced101_service_uuid[LEN_UUID_128] = { __UUID_WICED101 };
 
     /* Advertisement Element for Flags */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_FLAG;
@@ -215,10 +215,10 @@ void ex02_ble_ntfy_set_advertisement_data( void )
     adv_elem[num_elem].p_data = BT_LOCAL_NAME;
     num_elem++;
 
-    /* Advertisement Element for CapSense Service */
+    /* Advertisement Element for Wiced101 Service */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE;
     adv_elem[num_elem].len = LEN_UUID_128;
-    adv_elem[num_elem].p_data = capsense_service_uuid;
+    adv_elem[num_elem].p_data = wiced101_service_uuid;
     num_elem++;
 
     /* Set Raw Advertisement Data */

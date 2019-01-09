@@ -31,7 +31,7 @@
 // ----- Characteristic 'LED'
 #define HDLC_WICED101_LED                     0x0029
 #define HDLC_WICED101_LED_VALUE               0x002A
-// ----- Characteristic 'Buttons'
+// ----- Characteristic 'Button'
 #define HDLC_WICED101_BUTTON                  0x002B
 #define HDLC_WICED101_BUTTON_VALUE            0x002C
 // ===== CCCD

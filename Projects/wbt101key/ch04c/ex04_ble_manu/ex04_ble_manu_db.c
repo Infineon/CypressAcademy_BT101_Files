@@ -4,11 +4,11 @@
  *
  */
 
-// ex02_ble_manu_db.c
+// ex04_ble_manu_db.c
 
 #include "wiced_bt_uuid.h"
 #include "wiced_bt_gatt.h"
-#include "ex02_ble_manu_db.h"
+#include "ex04_ble_manu_db.h"
 
 /*************************************************************************************
 ** GATT server definitions
