@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Design xmlns="http://cypress.com/xsd/cydesignfile_v1" version="10">
+  <ToolInfo version="1.0.0"/>
+  <Device mpn="CYW20819A1KFBG"/>
+  <Platform name="CYW920819EVB-02"/>
+  <Kits>
+    <Kit name="CYW920819EVB-02" version="1.0"/>
+  </Kits>
+  <Libraries>
+    <Library name="bt_20819A1" version="1.0"/>
+  </Libraries>
+  <ConfiguratorData/>
+  <BlockConfig>
+    <Pins>
+      <Block location="bluetooth[0]" alias="" template="20x19_bluetooth" version="1.0">
+        <Param id="configurator" value="0"/>
+      </Block>
+      <Block location="i2c[0]" alias="" template="20x19_i2c" version="1.0"/>
+      <Block location="ioss[0]" alias="" template="20x19_ioss" version="1.0"/>
+      <Block location="ioss[0].pin[0]" alias="BUTTON" template="20x19_pin" version="1.0">
+        <Param id="Type" value="BUTTON"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_HIGH"/>
+        <Param id="PressedValue" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[11]" alias="SPI_CLK" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[15]" alias="SPI_CS" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[17]" alias="SPI_MISO" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[26]" alias="LED2" template="20x19_pin" version="1.0">
+        <Param id="Type" value="LED"/>
+        <Param id="Index" value="2"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_HIGH"/>
+        <Param id="Control" value="GPIO_OUTPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[27]" alias="LED1" template="20x19_pin" version="1.0">
+        <Param id="Type" value="LED"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_HIGH"/>
+        <Param id="Control" value="GPIO_OUTPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[28]" alias="I2C_SCL" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[29]" alias="I2C_SDA" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[32]" alias="UART_TX" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[37]" alias="UART_RX" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="ioss[0].pin[6]" alias="SPI_MOSI" template="20x19_pin" version="1.0">
+        <Param id="Type" value="PERIPHERAL"/>
+        <Param id="Index" value="1"/>
+        <Param id="DefaultState" value="GPIO_PIN_OUTPUT_LOW"/>
+        <Param id="Control" value="GPIO_INPUT_ENABLE"/>
+        <Param id="PullMode" value="GPIO_PULL_UP_DOWN_NONE"/>
+        <Param id="Trigger" value="GPIO_LEVEL_TRIGGER"/>
+        <Param id="TriggerPolarityInvert" value="false"/>
+        <Param id="TriggerBothEdge" value="false"/>
+        <Param id="InterruptEnable" value="false"/>
+        <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
+        <Param id="GlobalInput" value="true"/>
+        <Param id="inFlash" value="true"/>
+      </Block>
+      <Block location="spi[0]" alias="" template="20x19_spi" version="1.0"/>
+      <Block location="uart[1]" alias="" template="20x19_uart" version="1.0"/>
+    </Pins>
+  </BlockConfig>
+  <Netlist>
+    <Net>
+      <Port name="i2c[0].scl[0]"/>
+      <Port name="ioss[0].pin[28].aux[0]"/>
+    </Net>
+    <Net>
+      <Port name="i2c[0].sda[0]"/>
+      <Port name="ioss[0].pin[29].aux[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[11].aux[0]"/>
+      <Port name="spi[0].clk[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[15].aux[0]"/>
+      <Port name="spi[0].cs[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[17].aux[0]"/>
+      <Port name="spi[0].miso[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[32].aux[0]"/>
+      <Port name="uart[1].txd[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[37].aux[0]"/>
+      <Port name="uart[1].rxd[0]"/>
+    </Net>
+    <Net>
+      <Port name="ioss[0].pin[6].aux[0]"/>
+      <Port name="spi[0].mosi[0]"/>
+    </Net>
+  </Netlist>
+</Design>

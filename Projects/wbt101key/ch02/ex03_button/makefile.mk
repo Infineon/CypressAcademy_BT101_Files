@@ -1,3 +1,0 @@
-APP_SRC +=  ex03_button.c
-
-C_FLAGS += -DWICED_BT_TRACE_ENABLE
