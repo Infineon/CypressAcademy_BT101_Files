@@ -55,7 +55,7 @@ CY_APP_DEFINES += -DWICED_BT_TRACE_ENABLE
 # middleware editor.
 CY_MAINAPP_SWCOMP_EXT =
 
-CY_APP_SOURCE = ./app.c ./app_bt_cfg.c ./app_bt_cfg.h ./design.modus ./wiced_platform.h
+CY_APP_SOURCE = ./app.c ./app_bt_cfg.c ./app_bt_cfg.h 
 
 CY_APP_RESOURCES =
 

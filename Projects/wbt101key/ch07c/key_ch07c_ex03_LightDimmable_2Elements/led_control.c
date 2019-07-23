@@ -109,10 +109,10 @@ void led_control_set_brighness_level(uint8_t brightness_level, uint8_t element_i
 
     switch(element_idx)
     {
-    case 0:
+    case RED:
         wiced_hal_pwm_change_values(PWM_CHANNELR, pwm_config.toggle_count, pwm_config.init_count);
     	break;
-    case 1:
+    case GREEN:
         wiced_hal_pwm_change_values(PWM_CHANNELG, pwm_config.toggle_count, pwm_config.init_count);
     	break;
     }

@@ -81,9 +81,23 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			}
 			break;
 
+		case BTM_PAIRING_IO_CAPABILITIES_BLE_REQUEST_EVT:
+			break;
+
+		case BTM_PAIRING_COMPLETE_EVT:
+			break;
+
+		case BTM_ENCRYPTION_STATUS_EVT:
+			break;
+
+		case BTM_PAIRED_DEVICE_LINK_KEYS_UPDATE_EVT:
+			break;
+
 		case BTM_PAIRED_DEVICE_LINK_KEYS_REQUEST_EVT:
-			WICED_BT_TRACE("Paired Device Link Request Keys Event\r\n");
 			status = WICED_BT_ERROR;
+			break;
+
+		case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT:
 			break;
 
 		case BTM_BLE_SCAN_STATE_CHANGED_EVT:
@@ -101,6 +115,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 					WICED_BT_TRACE( "Low duty scanning.\r\n" );
 					break;
 			}
+			break;
+
+		case BTM_BLE_CONNECTION_PARAM_UPDATE:
 			break;
 
 		default:
@@ -147,7 +164,7 @@ wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt
 
 			if( p_event_data->operation_complete.response_data.att_value.len > 0 )
 			{
-				wiced_bt_trace_array( "Data: ", p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len );
+				WICED_BT_TRACE_ARRAY( p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len, "Data: " );
 			}
 			else
 			{
@@ -251,7 +268,7 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 		p_service = (char *)wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
 		if( len > 0 )
 		{
-			wiced_bt_trace_array( "Service: ", (uint8_t*)p_service, len );
+			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
 		}
 
 		wiced_bool_t xx = wiced_bt_gatt_le_connect( p_scan_result->remote_bd_addr, p_scan_result->ble_addr_type, BLE_CONN_MODE_HIGH_DUTY, WICED_TRUE );

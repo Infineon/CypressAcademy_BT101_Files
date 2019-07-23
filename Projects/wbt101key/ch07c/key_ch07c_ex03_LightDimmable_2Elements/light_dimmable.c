@@ -81,6 +81,9 @@
 #include "hci_control_api.h"
 #endif
 
+#include "wiced_bt_cfg.h"
+extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
+
 /******************************************************
  *          Constants
  ******************************************************/
@@ -104,9 +107,8 @@ static void mesh_app_process_set_level(uint8_t element_idx, wiced_bt_mesh_light_
 /******************************************************
  *          Variables Definitions
  ******************************************************/
-uint32_t element_index = 0;
+uint32_t global_element_index = 0;
 
-char   *mesh_dev_name                                                             = "2 Element Light KEY";
 uint8_t mesh_appearance[WICED_BT_MESH_PROPERTY_LEN_DEVICE_APPEARANCE]             = { BIT16_TO_8(APPEARANCE_LIGHT_CEILING) };
 uint8_t mesh_mfr_name[WICED_BT_MESH_PROPERTY_LEN_DEVICE_MANUFACTURER_NAME]        = { 'C', 'y', 'p', 'r', 'e', 's', 's', 0 };
 uint8_t mesh_model_num[WICED_BT_MESH_PROPERTY_LEN_DEVICE_MODEL_NUMBER]            = { 'A', '1', '9', 0 };
@@ -132,17 +134,13 @@ wiced_bt_mesh_core_config_property_t mesh_element1_properties[] =
     },
 };
 #define MESH_APP_NUM_PROPERTIES (sizeof(mesh_element1_properties) / sizeof(wiced_bt_mesh_core_config_property_t))
-
-#define MESH_LIGHT_LIGHTNESS_SERVER_RED_INDEX   0
-
+#define MESH_LIGHT_LIGHTNESS_SERVER_ELEMENT_INDEX 0
 
 wiced_bt_mesh_core_config_model_t   mesh_element2_models[] =
 {
     WICED_BT_MESH_MODEL_LIGHT_LIGHTNESS_SERVER,
 };
 #define MESH_APP_NUM_MODELS_GREEN  (sizeof(mesh_element2_models) / sizeof(wiced_bt_mesh_core_config_model_t))
-
-#define MESH_LIGHT_LIGHTNESS_SERVER_GREEN_INDEX   1
 
 
 wiced_bt_mesh_core_config_element_t mesh_elements[] =
@@ -219,7 +217,7 @@ wiced_bt_mesh_app_func_table_t wiced_bt_mesh_app_func_table =
     NULL                    // factory reset
 };
 
-uint8_t last_known_brightness = 0;
+uint8_t last_known_brightness[2] = {0};
 uint8_t attention_brightness = 0;
 uint8_t attention_time = 0;
 
@@ -235,6 +233,8 @@ void mesh_app_init(wiced_bool_t is_provisioned)
     extern uint8_t wiced_bt_mesh_model_trace_enabled;
     wiced_bt_mesh_model_trace_enabled = WICED_TRUE;
 #endif
+	wiced_bt_cfg_settings.device_name = (uint8_t *)"2 Elements Key";
+    wiced_bt_cfg_settings.gatt_cfg.appearance = APPEARANCE_LIGHT_CEILING;
     mesh_prop_fw_version[0] = 0x30 + (WICED_SDK_MAJOR_VER / 10);
     mesh_prop_fw_version[1] = 0x30 + (WICED_SDK_MAJOR_VER % 10);
     mesh_prop_fw_version[2] = 0x30 + (WICED_SDK_MINOR_VER / 10);
@@ -243,17 +243,39 @@ void mesh_app_init(wiced_bool_t is_provisioned)
     mesh_prop_fw_version[5] = 0x30 + (WICED_SDK_REV_NUMBER % 10);
     mesh_prop_fw_version[6] = 0x30 + (WICED_SDK_BUILD_NUMBER / 10);
     mesh_prop_fw_version[7] = 0x30 + (WICED_SDK_BUILD_NUMBER % 10);
+	
+	 // Adv Data is fixed. Spec allows to put URI, Name, Appearance and Tx Power in the Scan Response Data.
+    if (!is_provisioned)
+    {
+        wiced_bt_ble_advert_elem_t  adv_elem[3];
+        uint8_t                     buf[2];
+        uint8_t                     num_elem = 0;
+
+        adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_NAME_COMPLETE;
+        adv_elem[num_elem].len         = (uint16_t)strlen((const char*)wiced_bt_cfg_settings.device_name);
+        adv_elem[num_elem].p_data      = wiced_bt_cfg_settings.device_name;
+        num_elem++;
+
+        adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_APPEARANCE;
+        adv_elem[num_elem].len         = 2;
+        buf[0]                         = (uint8_t)wiced_bt_cfg_settings.gatt_cfg.appearance;
+        buf[1]                         = (uint8_t)(wiced_bt_cfg_settings.gatt_cfg.appearance >> 8);
+        adv_elem[num_elem].p_data      = buf;
+        num_elem++;
+
+        wiced_bt_mesh_set_raw_scan_response_data(num_elem, adv_elem);
+    }
 
     led_control_init();
 
-    wiced_init_timer(&attention_timer, attention_timer_cb, element_index, WICED_SECONDS_PERIODIC_TIMER);
+    wiced_init_timer(&attention_timer, attention_timer_cb, global_element_index, WICED_SECONDS_PERIODIC_TIMER);
 
     // Initialize Light Lightness Server and register a callback which will be executed when it is time to change the brightness of the bulb
-    wiced_bt_mesh_model_light_lightness_server_init(MESH_LIGHT_LIGHTNESS_SERVER_RED_INDEX, mesh_app_message_handler, is_provisioned);
-    wiced_bt_mesh_model_light_lightness_server_init(MESH_LIGHT_LIGHTNESS_SERVER_GREEN_INDEX, mesh_app_message_handler, is_provisioned);
+    wiced_bt_mesh_model_light_lightness_server_init(RED, mesh_app_message_handler, is_provisioned);
+    wiced_bt_mesh_model_light_lightness_server_init(GREEN, mesh_app_message_handler, is_provisioned);
 
     // Initialize the Property Server.  We do not need to be notified when Property is set, because our only property is readonly
-    wiced_bt_mesh_model_property_server_init(MESH_LIGHT_LIGHTNESS_SERVER_RED_INDEX, NULL, is_provisioned);
+    wiced_bt_mesh_model_property_server_init(MESH_LIGHT_LIGHTNESS_SERVER_ELEMENT_INDEX, NULL, is_provisioned);
 }
 
 /*
@@ -267,13 +289,13 @@ void mesh_app_attention(uint8_t element_idx, uint8_t time)
     if (time == 0)
     {
         wiced_stop_timer(&attention_timer);
-        led_control_set_brighness_level(last_known_brightness, element_idx);
+        led_control_set_brighness_level(last_known_brightness[element_idx], element_idx);
         return;
     }
-    element_index = element_idx;
+    global_element_index = element_idx;
     wiced_start_timer(&attention_timer, 1);
     attention_time = time;
-    attention_brightness = (last_known_brightness != 0) ? 0 : 100;
+    attention_brightness = (last_known_brightness[element_idx] != 0) ? 0 : 100;
     led_control_set_brighness_level(attention_brightness, element_idx);
 }
 
@@ -288,7 +310,7 @@ void attention_timer_cb(TIMER_PARAM_TYPE arg)
     if (--attention_time == 0)
     {
         wiced_stop_timer(&attention_timer);
-        led_control_set_brighness_level(last_known_brightness, (uint8_t)arg);
+        led_control_set_brighness_level(last_known_brightness[global_element_index], (uint8_t)arg);
         return;
     }
     attention_brightness = (attention_brightness == 0) ? 100 : 0;
@@ -320,8 +342,8 @@ void mesh_app_process_set_level(uint8_t element_idx, wiced_bt_mesh_light_lightne
     WICED_BT_TRACE("mesh light srv set level element:%d present actual:%d linear:%d remaining_time:%d\n",
         element_idx, p_status->lightness_actual_present, p_status->lightness_linear_present, p_status->remaining_time);
 
-    last_known_brightness = (uint8_t)((uint32_t)p_status->lightness_actual_present * 100 / 65535);
-    led_control_set_brighness_level(last_known_brightness, element_idx);
+    last_known_brightness[element_idx] = (uint8_t)((uint32_t)p_status->lightness_actual_present * 100 / 65535);
+    led_control_set_brighness_level(last_known_brightness[element_idx], element_idx);
 
     // If we were alerting user, stop it.
     wiced_stop_timer(&attention_timer);

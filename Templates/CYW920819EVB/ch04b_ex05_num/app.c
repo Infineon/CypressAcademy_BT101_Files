@@ -111,6 +111,10 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			if( WICED_BT_SUCCESS == p_event_data->enabled.status )
 			{
 				WICED_BT_TRACE( "Bluetooth Enabled\r\n" );
+				
+				/*Configure the PWM*/
+				wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_LED_1, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+				wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_1, WICED_PWM0);
 
 				/* Use Application Settings dialog to set BT_DEVICE_ADDRESS = random */
 				wiced_bt_device_address_t bda;
@@ -128,7 +132,7 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			        bonded = WICED_TRUE; /* We have bonding information already, so don't go into bonding mode */
 			    }
 
-				/* Configure the GATT database and advertise for connections */
+				/* Register GATT callback and initialize the GATT database */
 				wiced_bt_gatt_register( app_gatt_callback );
 				wiced_bt_gatt_db_init( gatt_database, gatt_database_len );
 
@@ -394,7 +398,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
 	uint16_t *p_len = 		p_attr->data.read_req.p_val_len;
 
     int i = 0;
-    wiced_bool_t isHandleInTable = WICED_FALSE;
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
     // Check for a matching handle entry
@@ -402,8 +405,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
     {
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in external lookup table
-            isHandleInTable = WICED_TRUE;
             // Detected a matching handle in the external lookup table
             if (app_gatt_db_ext_attr_tbl[i].cur_len <= *p_len)
             {
@@ -428,22 +429,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
         }
     }
 
-    if (!isHandleInTable)
-    {
-        // TODO: Add code to read value using handles not contained within external lookup table
-        // This can apply when the option is enabled to not generate initial value arrays.
-        // If the value for the current handle is successfully read then set the result using:
-        // res = WICED_BT_GATT_SUCCESS;
-        switch ( attr_handle )
-        {
-			default:
-				// The read operation was not performed for the indicated handle
-				WICED_BT_TRACE("Read Request to Invalid Handle: 0x%x\r\n", attr_handle);
-				res = WICED_BT_GATT_READ_NOT_PERMIT;
-				break;
-        }
-    }
-
     return res;
 }
 
@@ -458,7 +443,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 	uint16_t len = 			p_attr->data.write_req.val_len;
 
     int i = 0;
-    wiced_bool_t isHandleInTable = WICED_FALSE;
     wiced_bool_t validLen = WICED_FALSE;
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
@@ -467,8 +451,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
     {
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in external lookup table
-            isHandleInTable = WICED_TRUE;
             // Verify that size constraints have been met
             validLen = (app_gatt_db_ext_attr_tbl[i].max_len >= len);
             if (validLen)
@@ -502,22 +484,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 res = WICED_BT_GATT_INVALID_ATTR_LEN;
             }
             break;
-        }
-    }
-
-    if (!isHandleInTable)
-    {
-        // TODO: Add code to write value using handles not contained within external lookup table
-        // This can apply when the option is enabled to not generate initial value arrays.
-        // If the value for the current handle is successfully written then set the result using:
-        // res = WICED_BT_GATT_SUCCESS;
-        switch ( attr_handle )
-        {
-			default:
-				// The write operation was not performed for the indicated handle
-				WICED_BT_TRACE("Write Request to Invalid Handle: 0x%x\r\n", attr_handle);
-				res = WICED_BT_GATT_WRITE_NOT_PERMIT;
-				break;
         }
     }
 

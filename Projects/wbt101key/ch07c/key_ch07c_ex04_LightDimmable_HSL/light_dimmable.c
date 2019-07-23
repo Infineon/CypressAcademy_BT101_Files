@@ -81,6 +81,9 @@
 #include "hci_control_api.h"
 #endif
 
+#include "wiced_bt_cfg.h"
+extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
+
 /******************************************************
  *          Constants
  ******************************************************/
@@ -104,7 +107,6 @@ static void mesh_app_process_set_hsl(uint8_t element_idx, wiced_bt_mesh_light_hs
  *          Variables Definitions
  ******************************************************/
 
-char   *mesh_dev_name                                                             = "HSL Light KEY";
 uint8_t mesh_appearance[WICED_BT_MESH_PROPERTY_LEN_DEVICE_APPEARANCE]             = { BIT16_TO_8(APPEARANCE_LIGHT_CEILING) };
 uint8_t mesh_mfr_name[WICED_BT_MESH_PROPERTY_LEN_DEVICE_MANUFACTURER_NAME]        = { 'C', 'y', 'p', 'r', 'e', 's', 's', 0 };
 uint8_t mesh_model_num[WICED_BT_MESH_PROPERTY_LEN_DEVICE_MODEL_NUMBER]            = { 'A', '1', '9', 0 };
@@ -246,6 +248,8 @@ void mesh_app_init(wiced_bool_t is_provisioned)
     extern uint8_t wiced_bt_mesh_model_trace_enabled;
     wiced_bt_mesh_model_trace_enabled = WICED_TRUE;
 #endif
+	wiced_bt_cfg_settings.device_name = (uint8_t *)"HSL Key";
+    wiced_bt_cfg_settings.gatt_cfg.appearance = APPEARANCE_LIGHT_CEILING;
     mesh_prop_fw_version[0] = 0x30 + (WICED_SDK_MAJOR_VER / 10);
     mesh_prop_fw_version[1] = 0x30 + (WICED_SDK_MAJOR_VER % 10);
     mesh_prop_fw_version[2] = 0x30 + (WICED_SDK_MINOR_VER / 10);
@@ -256,6 +260,28 @@ void mesh_app_init(wiced_bool_t is_provisioned)
     mesh_prop_fw_version[7] = 0x30 + (WICED_SDK_BUILD_NUMBER % 10);
 
     led_control_init();
+	
+	// Adv Data is fixed. Spec allows to put URI, Name, Appearance and Tx Power in the Scan Response Data.
+    if (!is_provisioned)
+    {
+        wiced_bt_ble_advert_elem_t  adv_elem[3];
+        uint8_t                     buf[2];
+        uint8_t                     num_elem = 0;
+
+        adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_NAME_COMPLETE;
+        adv_elem[num_elem].len         = (uint16_t)strlen((const char*)wiced_bt_cfg_settings.device_name);
+        adv_elem[num_elem].p_data      = wiced_bt_cfg_settings.device_name;
+        num_elem++;
+
+        adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_APPEARANCE;
+        adv_elem[num_elem].len         = 2;
+        buf[0]                         = (uint8_t)wiced_bt_cfg_settings.gatt_cfg.appearance;
+        buf[1]                         = (uint8_t)(wiced_bt_cfg_settings.gatt_cfg.appearance >> 8);
+        adv_elem[num_elem].p_data      = buf;
+        num_elem++;
+
+        wiced_bt_mesh_set_raw_scan_response_data(num_elem, adv_elem);
+    }
 
     // Initialize Light Lightness Server and register a callback which will be executed when it is time to change the brightness of the bulb
     wiced_bt_mesh_model_light_hsl_server_init(MESH_LIGHT_HSL_SERVER_ELEMENT_INDEX, mesh_app_message_handler, is_provisioned);

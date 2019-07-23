@@ -9,6 +9,7 @@
 
 #include "GeneratedSource/cycfg.h"
 
+/* TODO Ex 01, Ex 02: Include header files */
 
 /*******************************************************************
  * Macros to assist development of the exercises
@@ -48,6 +49,8 @@ void							app_set_advertisement_data( void );
 /*******************************************************************
  * Global/Static Variables
  ******************************************************************/
+
+/* TODO Ex 02: Add global variables */
 
 
 /*******************************************************************************
@@ -90,14 +93,15 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 				wiced_bt_dev_read_local_addr( bda );
 				WICED_BT_TRACE( "Local Bluetooth Device Address: [%B]\r\n", bda );
 
-				/* TODO: Configure the GATT database and advertise for connections */
+				/* TODO Ex 01, Ex 02: Register GATT callback and initialize the GATT database */
+
+
+				/* TODO Ex 01, Ex 02: Enable/disable pairing */
 
 				
+                /* TODO Ex 02: Configure PWM */
 
-				/* TODO: Enable/disable pairing */
 
-				
-				
 				/* Create the packet and begin advertising */
 				app_set_advertisement_data();
 				wiced_bt_start_advertisements( BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL );
@@ -136,7 +140,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			break;
 
 		case BTM_BLE_ADVERT_STATE_CHANGED_EVT:					// Advertising State Change
-			WICED_BT_TRACE( "Advertising state = %d\r\n", p_event_data->ble_advert_state_changed );
+            WICED_BT_TRACE( "Advertising state = %d\r\n", p_event_data->ble_advert_state_changed );
+            /* TODO Ex 02: Set PWM to appropriate duty cycle */
 			break;
 
 		default:
@@ -167,14 +172,14 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 			{
 				WICED_BT_TRACE( "GATT_CONNECTION_STATUS_EVT: Connect BDA %B, Connection ID %d\r\n",p_conn->bd_addr, p_conn->conn_id );
 				
-				/* TODO: Handle the connection */
+				/* TODO Ex 02: Handle the connection */
 			}
 			else
 			{
 				// Device has disconnected
 				WICED_BT_TRACE( "GATT_CONNECTION_STATUS_EVT: Disconnect BDA %B, Connection ID %d, Reason=%d\r\n", p_conn->bd_addr, p_conn->conn_id, p_conn->reason );
 				
-				/* TODO: Handle the disconnection */
+				/* TODO Ex 02: Handle the disconnection */
 
 				/* Restart the advertisements */
 				wiced_bt_start_advertisements( BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL );
@@ -241,7 +246,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
 	uint16_t *p_len = 		p_attr->data.read_req.p_val_len;
 
 	int i = 0;
-    wiced_bool_t isHandleInTable = WICED_FALSE;
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
     // Check for a matching handle entry
@@ -249,8 +253,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
     {
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in external lookup table
-            isHandleInTable = WICED_TRUE;
             // Detected a matching handle in the external lookup table
             if (app_gatt_db_ext_attr_tbl[i].cur_len <= *p_len)
             {
@@ -259,7 +261,7 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
                 memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data, app_gatt_db_ext_attr_tbl[i].cur_len);
                 res = WICED_BT_GATT_SUCCESS;
 
-                // TODO: Add code for any action required when this attribute is read
+                // TODO Ex 01: Add code for any action required when this attribute is read
                 switch ( attr_handle )
                 {
 //					case handle:
@@ -271,22 +273,6 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
                 // Value to read will not fit within the buffer
                 res = WICED_BT_GATT_INVALID_ATTR_LEN;
             }
-            break;
-        }
-    }
-
-    if (!isHandleInTable)
-    {
-        // TODO: Add code to read value using handles not contained within external lookup table
-        // This can apply when the option is enabled to not generate initial value arrays.
-        // If the value for the current handle is successfully read then set the result using:
-        // res = WICED_BT_GATT_SUCCESS;
-        switch ( attr_handle )
-        {
-        default:
-            // The read operation was not performed for the indicated handle
-            WICED_BT_TRACE("Read Request to Invalid Handle: 0x%x\n", attr_handle);
-            res = WICED_BT_GATT_READ_NOT_PERMIT;
             break;
         }
     }
@@ -306,7 +292,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 	uint16_t len = 			p_attr->data.write_req.val_len;
 
 	int i = 0;
-    wiced_bool_t isHandleInTable = WICED_FALSE;
     wiced_bool_t validLen = WICED_FALSE;
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
@@ -316,7 +301,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
             // Detected a matching handle in external lookup table
-            isHandleInTable = WICED_TRUE;
             // Verify that size constraints have been met
             validLen = (app_gatt_db_ext_attr_tbl[i].max_len >= len);
             if (validLen)
@@ -326,7 +310,7 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 memcpy(app_gatt_db_ext_attr_tbl[i].p_data, p_val, len);
                 res = WICED_BT_GATT_SUCCESS;
 
-                // TODO: Add code for any action required when this attribute is written
+                // TODO Ex 01: Add code for any action required when this attribute is written
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
@@ -339,22 +323,6 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // Value to write does not meet size constraints
                 res = WICED_BT_GATT_INVALID_ATTR_LEN;
             }
-            break;
-        }
-    }
-
-    if (!isHandleInTable)
-    {
-        // TODO: Add code to write value using handles not contained within external lookup table
-        // This can apply when the option is enabled to not generate initial value arrays.
-        // If the value for the current handle is successfully written then set the result using:
-        // res = WICED_BT_GATT_SUCCESS;
-        switch ( attr_handle )
-        {
-        default:
-            // The write operation was not performed for the indicated handle
-            WICED_BT_TRACE("Write Request to Invalid Handle: 0x%x\n", attr_handle);
-            res = WICED_BT_GATT_WRITE_NOT_PERMIT;
             break;
         }
     }

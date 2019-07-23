@@ -75,6 +75,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			}
 			break;
 
+		case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT:
+			break;
+			
 		case BTM_BLE_SCAN_STATE_CHANGED_EVT:
 			switch( p_event_data->ble_scan_state_changed )
 			{
@@ -188,7 +191,7 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 		p_service = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
 		if( p_service && len > 0 )
 		{
-			wiced_bt_trace_array( "Service: ", (uint8_t*)p_service, len );
+			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
 		}
 	}
 }

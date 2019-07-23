@@ -43,6 +43,11 @@
 extern "C" {
 #endif
 
+typedef enum {
+	RED,
+	GREEN,
+} led_control_t;
+
 void led_control_init(void);
 void led_control_set_brighness_level(uint8_t brightness_level, uint8_t element_idx);
 

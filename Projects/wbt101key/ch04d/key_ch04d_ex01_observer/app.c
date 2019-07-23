@@ -73,6 +73,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			}
 			break;
 
+		case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT:
+			break;
+
 		case BTM_BLE_SCAN_STATE_CHANGED_EVT:
 			switch( p_event_data->ble_scan_state_changed )
 			{

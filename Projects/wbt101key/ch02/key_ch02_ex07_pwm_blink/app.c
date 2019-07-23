@@ -76,6 +76,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
 	        /* Configure and start the PWM */
+			wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_LED_1, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+			wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_1, WICED_PWM1);
             wiced_hal_aclk_enable( PWM_FREQUENCY, ACLK1, ACLK_FREQ_24_MHZ );
 	        wiced_hal_pwm_start( PWM1, PMU_CLK, PWM_TOGGLE, PWM_INIT, 0 );
          }

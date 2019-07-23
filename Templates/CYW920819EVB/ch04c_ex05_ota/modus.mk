@@ -61,8 +61,6 @@ CY_MAINAPP_SWCOMP_EXT =
 CY_APP_SOURCE = ./app.c							\
 				./app_bt_cfg.c				\
 				./app_bt_cfg.h				\
-				./wiced_platform.h			\
-				./design.modus				\
 				./GeneratedSource/cycfg_bt.h		\
 
 CY_APP_RESOURCES =

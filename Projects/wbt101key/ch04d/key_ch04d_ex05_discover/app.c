@@ -30,7 +30,6 @@ void					startCharacteristicDiscovery( void );
 void					startDescriptorDiscovery( void );
 
 
-
 /*******************************************************************
  * Global/Static Variables
  ******************************************************************/
@@ -38,11 +37,14 @@ uint16_t connection_id = 0;
 uint16_t ledHandle = 0x0009u;		/* Check this matches your peripheral HDLC_MODUS_RGBLED_VALUE */
 uint16_t cccdHandle = 0x000Cu;		/* Check this matches your peripheral HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG */
 
-static const uint8_t serviceUUID[] = { 0x0Au, 0x71u, 0x06u, 0xCAu, 0x27u, 0x68u, 0x44u, 0x8Du, 0xECu, 0x47u, 0x76u, 0x07u, 0x6Eu, 0x82u, 0x91u, 0x79u };
+#define __UUID_SERVICE_MODUS                        0x0Au, 0x71u, 0x06u, 0xCAu, 0x27u, 0x68u, 0x44u, 0x8Du, 0xECu, 0x47u, 0x76u, 0x07u, 0x6Eu, 0x82u, 0x91u, 0x79u
+#define __UUID_CHARACTERISTIC_MODUS_RGBLED          0x74u, 0x66u, 0xB9u, 0x3Cu, 0x38u, 0x7Du, 0xADu, 0x99u, 0x74u, 0x46u, 0x9Du, 0x81u, 0x95u, 0x05u, 0xAAu, 0x02u
+#define __UUID_CHARACTERISTIC_MODUS_COUNTER         0x68u, 0xB9u, 0xECu, 0x13u, 0xEBu, 0x9Fu, 0x7Bu, 0x96u, 0x89u, 0x45u, 0x69u, 0x0Au, 0x63u, 0xB2u, 0xA5u, 0xFCu
+#define __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION    0x2902u
+
+static const uint8_t serviceUUID[] = { __UUID_SERVICE_MODUS };
 static uint16_t serviceStartHandle = 0x0001;
 static uint16_t serviceEndHandle   = 0xFFFF;
-
-#define UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION		(0x2902)
 
 typedef struct
 {
@@ -52,16 +54,15 @@ typedef struct
     uint16_t cccdHandle;
 } charHandle_t;
 
-static const uint8_t ledUUID[] = { 0x74u, 0x66u, 0xB9u, 0x3Cu, 0x38u, 0x7Du, 0xADu, 0x99u, 0x74u, 0x46u, 0x9Du, 0x81u, 0x95u, 0x05u, 0xAAu, 0x02u };
+static const uint8_t ledUUID[] = { __UUID_CHARACTERISTIC_MODUS_RGBLED };
 static charHandle_t  ledChar;
 
-static const uint8_t counterUUID[] = { 0x68u, 0xB9u, 0xECu, 0x13u, 0xEBu, 0x9Fu, 0x7Bu, 0x96u, 0x89u, 0x45u, 0x69u, 0x0Au, 0x63u, 0xB2u, 0xA5u, 0xFCu };
+static const uint8_t counterUUID[] = { __UUID_CHARACTERISTIC_MODUS_COUNTER };
 static charHandle_t  counterChar;
 
 #define MAX_CHARS_DISCOVERED (10)
 static charHandle_t charHandles[MAX_CHARS_DISCOVERED];
 static uint32_t charHandleCount;
-
 
 
 /*******************************************************************************
@@ -111,9 +112,23 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			}
 			break;
 
+		case BTM_PAIRING_IO_CAPABILITIES_BLE_REQUEST_EVT:
+			break;
+
+		case BTM_PAIRING_COMPLETE_EVT:
+			break;
+
+		case BTM_ENCRYPTION_STATUS_EVT:
+			break;
+
+		case BTM_PAIRED_DEVICE_LINK_KEYS_UPDATE_EVT:
+			break;
+
 		case BTM_PAIRED_DEVICE_LINK_KEYS_REQUEST_EVT:
-			WICED_BT_TRACE("Paired Device Link Request Keys Event\r\n");
 			status = WICED_BT_ERROR;
+			break;
+
+		case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT:
 			break;
 
 		case BTM_BLE_SCAN_STATE_CHANGED_EVT:
@@ -131,6 +146,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 					WICED_BT_TRACE( "Low duty scanning.\r\n" );
 					break;
 			}
+			break;
+
+		case BTM_BLE_CONNECTION_PARAM_UPDATE:
 			break;
 
 		default:
@@ -173,7 +191,7 @@ wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt
 
 			if( p_event_data->operation_complete.response_data.att_value.len > 0 )
 			{
-				wiced_bt_trace_array( "Data: ", p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len );
+				WICED_BT_TRACE_ARRAY( p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len, "Data: " );
 			}
 			else
 			{
@@ -246,10 +264,25 @@ wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt
 				}
 				WICED_BT_TRACE( "\r\n" );
 
-				if( GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID16( p_event_data ) == UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION )
+				if( GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID16( p_event_data ) == __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION )
 				{
 					counterChar.cccdHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_VALUE_HANDLE( p_event_data );
 				}
+			}
+			break;
+
+		case GATT_DISCOVERY_CPLT_EVT:
+			// Once all characteristics are discovered... you need to setup the end handles
+			if( p_event_data->discovery_complete.disc_type == GATT_DISCOVER_CHARACTERISTICS )
+			{
+			  for( int i=0; i<charHandleCount; i++ )
+			  {
+			    if( charHandles[i].startHandle == ledChar.startHandle )
+			      ledChar.endHandle = charHandles[i].endHandle;
+
+			    if( charHandles[i].startHandle == counterChar.startHandle )
+			       counterChar.endHandle = charHandles[i].endHandle;
+			  }
 			}
 			break;
 
@@ -366,7 +399,7 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 		p_service = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
 		if( p_service && len > 0 )
 		{
-			wiced_bt_trace_array( "Service: ", (uint8_t*)p_service, len );
+			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
 		}
 
 		/* Connect and turn off scanning */

@@ -73,6 +73,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
 			/* Configure and start the PWM */
+			wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_LED_2, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+			wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_2, WICED_PWM0);
 	        wiced_hal_pwm_start( PWM0, LHL_CLK, PWM_TOGGLE, PWM_INIT, 0 );
 			
 			/* The stack is safely up - create a thread to test out peripherals */

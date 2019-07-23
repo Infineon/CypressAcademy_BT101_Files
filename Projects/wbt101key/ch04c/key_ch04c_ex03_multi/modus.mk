@@ -1,6 +1,6 @@
 # This is a file used and owned by the ModusToolbox IDE. Users should not modify this file.
 CY_MAINAPP_SWCOMP_USED= \
-    bt_20819A1-1.0/components/BT-SDK/common/libraries/beacon_lib
+    bt_sdk-1.1/components/BT-SDK/common/libraries/beacon_lib
 CY_MIDDLEWARE_SELECTOR_TOUCHED=true
 FEATURE_VALUES=BT_DEVICE_ADDRESS,default UART,AUTO APP_XIP,xip_pi ENABLE_DEBUG,0 
 DEVICE=CYW20819A1KFBG

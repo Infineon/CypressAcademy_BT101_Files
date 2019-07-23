@@ -16,6 +16,9 @@
 #define SLEEP_250MS		(250)
 #define SLEEP_1000MS	(1000)
 
+/* Globally define wiced_timer_t structure */
+wiced_timer_t led_timer;
+
 /*******************************************************************
  * Function Prototypes
  ******************************************************************/
@@ -65,7 +68,6 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
         	/* Start a periodic timer */
-        	wiced_timer_t led_timer;
         	wiced_init_timer( &led_timer, timer_cback, 0, WICED_MILLI_SECONDS_PERIODIC_TIMER );
         	wiced_start_timer( &led_timer, SLEEP_250MS );
         }
