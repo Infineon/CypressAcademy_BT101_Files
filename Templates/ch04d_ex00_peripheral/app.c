@@ -106,14 +106,16 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 		    wiced_hal_puart_enable_rx();
 
 			/* Configure the button to trigger an interrupt when pressed */
-			wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_DOWN | GPIO_EN_INT_BOTH_EDGE ), GPIO_PIN_OUTPUT_LOW );
-			wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, 0 );
-			
-			/* Turn off the RGB LED */
-			wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
-			wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_HIGH );
-			wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, GPIO_PIN_OUTPUT_HIGH );
-			
+		    wiced_platform_register_button_callback(WICED_PLATFORM_BUTTON_1, button_cback, 0, GPIO_EN_INT_BOTH_EDGE);
+
+			/* Turn off the LED(s) */
+			#ifdef LED_RED 	// Check if the kit has RGB LED (if LED_RED is defined)
+				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, GPIO_PIN_OUTPUT_HIGH );
+			#else // Just a single LED
+				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
+			#endif
         	/* Create the packet and begin advertising */
             app_set_advertisement_data();
             wiced_bt_start_advertisements( BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL );
@@ -292,8 +294,8 @@ wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_
                 // TODO: Add code for any action required when this attribute is read
                 switch ( attr_handle )
                 {
-					case HDLC_MODUS_RGBLED_VALUE:
-						WICED_BT_TRACE( "Reading LED (%d)\r\n", app_modus_rgbled[0] );
+					case HDLC_MODUS_LED_VALUE:
+						WICED_BT_TRACE( "Reading LED (%d)\r\n", app_modus_led[0] );
 						break;
 
 					case HDLC_MODUS_COUNTER_VALUE:
@@ -349,11 +351,15 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
-					case HDLC_MODUS_RGBLED_VALUE:
-						WICED_BT_TRACE( "Writing LED (%d)\r\n", app_modus_rgbled[0] );
-						wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, !( app_modus_rgbled[0] & 0x01 ) );
-						wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, !( app_modus_rgbled[0] & 0x02 ) );
-						wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, !( app_modus_rgbled[0] & 0x04 ) );
+					case HDLC_MODUS_LED_VALUE:
+						WICED_BT_TRACE( "Writing LED (%d)\r\n", app_modus_led[0] );
+						#ifdef LED_RED 	// Check if the kit has RGB LED (if LED_RED is defined)
+							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, !( app_modus_led[0] & 0x01 ) );
+							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, !( app_modus_led[0] & 0x02 ) );
+							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, !( app_modus_led[0] & 0x04 ) );
+						#else // Just a single LED
+							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, !app_modus_led[0] );
+						#endif
 						break;
 
 					case HDLC_MODUS_COUNTER_VALUE:
@@ -383,7 +389,8 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 ********************************************************************************/
 void button_cback( void *data, uint8_t port_pin )
 {
-	if( wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 ) )
+	if( wiced_platform_get_button_pressed_value( WICED_PLATFORM_BUTTON_1 ) ==
+			wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 ))
 	{
 		/* Button pressed, increment counter and notify */
 		app_modus_counter[0]++;
