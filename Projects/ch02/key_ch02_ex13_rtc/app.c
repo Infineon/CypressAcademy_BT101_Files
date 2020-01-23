@@ -269,7 +269,7 @@ void app_task( uint32_t arg )
 		rtcTime.day = entry;
 
 		/* TODO: Set the reference time/date */
-        rtc_setRTCTime( &rtcTime );
+        wiced_set_rtc_time( &rtcTime );
 
         /* EXIT this loop and start the clock running */
         break;
