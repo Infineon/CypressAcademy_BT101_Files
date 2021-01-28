@@ -1,5 +1,5 @@
 /*
- * Copyright 2019, Cypress Semiconductor Corporation or a subsidiary of
+ * Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
  * Cypress Semiconductor Corporation. All Rights Reserved.
  *
  * This software, including source code, documentation and related
@@ -37,7 +37,6 @@
  * Led control functionality
  *
  */
-
 #include "sparcommon.h"
 
 #include "wiced_hal_pwm.h"
@@ -60,13 +59,12 @@
 /******************************************************************************
  *                          Function Declarations
  ******************************************************************************/
-//float Hue_2_RGB( float v1, float v2, float vH ); //Function Hue_2_RGB
 void HSL_to_RGB(uint16_t hue, uint16_t sat, uint16_t light, uint8_t* r, uint8_t* g, uint8_t* b);
 
 /******************************************************************************
  *                                Variables Definitions
  ******************************************************************************/
-#if ( !defined(CYW20719B1) && !defined(CYW20819A1) && !defined(CYW20735B1) )
+#if ( !defined(CYW20719B1) && !defined(CYW20819A1) && !defined(CYW20735B1) && !defined(CYW20719B2) && !defined(CYW20721B2))
 #define WICED_GPIO_PIN_LED_2 1
 #endif
 wiced_bt_gpio_numbers_t led_pin = WICED_GPIO_PIN_LED_2;
@@ -84,7 +82,11 @@ wiced_bt_gpio_numbers_t led_pin_b = LED_BLUE;
  */
 void led_control_init(uint8_t control_type)
 {
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+    wiced_pwm_config_t pwm_config;
+#else
     pwm_config_t pwm_config;
+#endif
 
     if (control_type == LED_CONTROL_TYPE_ONOFF)
         return;
@@ -93,13 +95,19 @@ void led_control_init(uint8_t control_type)
     {
         /* configure PWM */
 #ifdef CYW20719B1
-        wiced_hal_pwm_configure_pin(led_pin, PWM_CHANNEL);
+        wiced_hal_pwm_configure_pin(led_pin, PWM_CHANNELR);
 #endif
 
-#if ( defined(CYW20819A1) || defined(CYW20735B1) )
+#if ( defined(CYW20819A1) || defined(CYW20735B1) || defined(CYW20719B2) || defined(CYW20721B2) )
         wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_2, WICED_PWM0);
 #endif
+
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+        wiced_hal_aclk_enable(PWM_INP_CLK_IN_HZ, WICED_ACLK1, WICED_ACLK_FREQ_24_MHZ);
+#else
         wiced_hal_aclk_enable(PWM_INP_CLK_IN_HZ, ACLK1, ACLK_FREQ_24_MHZ);
+#endif
+
         wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, 0, PWM_FREQ_IN_HZ, &pwm_config);
         wiced_hal_pwm_start(PWM_CHANNELR, PMU_CLK, pwm_config.toggle_count, pwm_config.init_count, 1);
     }
@@ -117,6 +125,59 @@ void led_control_init(uint8_t control_type)
     }
 }
 
+/*
+ * Set LED brightness level 0 to 100%
+ */
+void led_control_set_brighness_level(uint16_t hue, uint16_t saturation, uint16_t lightness)
+{
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+    wiced_pwm_config_t pwm_config;
+#else
+    pwm_config_t pwm_config;
+#endif
+
+    uint8_t PWMR = 0;
+    uint8_t PWMG = 0;
+    uint8_t PWMB = 0;
+
+    HSL_to_RGB(hue, saturation, lightness, &PWMR, &PWMG, &PWMB);
+
+	WICED_BT_TRACE("R:%d G:%d B:%d\n", PWMR, PWMG, PWMB);
+
+	// Setting brightness to 100% does not work well on 20719B1 platform. For now just use 99% instead of 100.
+	if (PWMR == 100)
+		PWMR = 99;
+	if (PWMG == 100)
+		PWMG = 99;
+	if (PWMB == 100)
+		PWMB = 99;
+
+	wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, PWMR, PWM_FREQ_IN_HZ, &pwm_config);
+	wiced_hal_pwm_change_values(PWM_CHANNELR, pwm_config.toggle_count, pwm_config.init_count);
+
+	wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, PWMG, PWM_FREQ_IN_HZ, &pwm_config);
+	wiced_hal_pwm_change_values(PWM_CHANNELG, pwm_config.toggle_count, pwm_config.init_count);
+
+	wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, PWMB, PWM_FREQ_IN_HZ, &pwm_config);
+	wiced_hal_pwm_change_values(PWM_CHANNELB, pwm_config.toggle_count, pwm_config.init_count);
+}
+
+/*
+ * Turn LED on or off
+ */
+void led_control_set_onoff(uint8_t onoff_value)
+{
+    WICED_BT_TRACE("set onoff:%d\n", onoff_value);
+
+    if (onoff_value == 1)           // led is on
+    {
+        wiced_hal_gpio_configure_pin(led_pin, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+    }
+    else if (onoff_value == 0)      // led is off
+    {
+        wiced_hal_gpio_configure_pin(led_pin, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
+    }
+}
 
 void led_control_set_brightness_level(uint16_t hue, uint16_t saturation, uint16_t lightness)
 {
@@ -149,17 +210,17 @@ void led_control_set_brightness_level(uint16_t hue, uint16_t saturation, uint16_
 }
 
 /* Convert HSL values to RGB values */
-/* Inputs: hue (0-360), sat (0-100), and lightness (0-100) */
-/* Outputs: r (0-100), g (0-100), b (0-100) */
+/* Inputs range 0-65535 */
+/* Output range: 0-100 */
 void HSL_to_RGB(uint16_t hue, uint16_t sat, uint16_t light, uint8_t* r, uint8_t* g, uint8_t* b)
 {
 	uint16_t v;
 
-    /* Formulas expect input in the range of 0-255 so need to convert
-	   they input ranges which are H: 0-360, S: 0-100, L: 0-100 */
-    hue = (hue*255)/360;
-    sat = (sat*255)/100;
-    light = (light*255)/100;
+    /* Formulas expect input in the range of 0-255 so we need to convert
+       the input range which is 0-65535. 65535/255 = 257 */
+    hue = hue/257;
+    sat = sat/257;
+    light = light/257;
 
     v = (light < 128) ? (light * (256 + sat)) >> 8 :
           (((light + sat) << 8) - light * sat) >> 8;
@@ -192,49 +253,5 @@ void HSL_to_RGB(uint16_t hue, uint16_t sat, uint16_t light, uint8_t* r, uint8_t*
            case 4: *r = mid1; *g = m; *b = v; break;
            case 5: *r = v; *g = m; *b = mid2; break;
         }
-    }
-}
-
-//float Hue_2_RGB( float v1, float v2, float vH ) //Function Hue_2_RGB
-//{
-//	if ( vH < 0 )
-//		{
-//			vH += 1;
-//		}
-//	if ( vH > 1 )
-//		{
-//			vH -= 1;
-//		}
-//	if (( 6 * vH ) < 1 )
-//	{
-//		return ( v1 + ( v2 - v1 ) * 6 * vH );
-//	}
-//	if (( 2 * vH ) < 1 )
-//	{
-//		return ( v2 );
-//	}
-//	if (( 3 * vH ) < 2 )
-//	{
-//		return ( v1 + ( v2 - v1 ) * ( ( 2/3 ) - vH ) * 6 );
-//	}
-//	return ( v1 );
-//}
-
-
-
-/*
- * Turn LED on or off
- */
-void led_control_set_onoff(uint8_t onoff_value)
-{
-    WICED_BT_TRACE("set onoff:%d\n", onoff_value);
-
-    if (onoff_value == 1)           // led is on
-    {
-        wiced_hal_gpio_configure_pin(led_pin, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
-    }
-    else if (onoff_value == 0)      // led is off
-    {
-        wiced_hal_gpio_configure_pin(led_pin, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
     }
 }

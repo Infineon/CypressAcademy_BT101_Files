@@ -65,8 +65,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
         	/* Configure the button to trigger an interrupt when pressed */
-        	wiced_hal_gpio_configure_pin( WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-        	wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, 0 );
+        	wiced_hal_gpio_configure_pin( USER_BUTTON1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
+        	wiced_hal_gpio_register_pin_for_interrupt( USER_BUTTON1, button_cback, 0 );
         }
         break;
 

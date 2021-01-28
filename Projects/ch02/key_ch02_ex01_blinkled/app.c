@@ -32,6 +32,9 @@ void app_task(uint32_t );
 ********************************************************************************/
 void application_start(void)
 {
+	wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_PUART );
+	WICED_BT_TRACE("**** CYW20819 App Start **** \n\r");
+
     /* Initialize Stack and Register Management Callback */
     wiced_bt_stack_init( app_bt_management_callback, &wiced_bt_cfg_settings, wiced_bt_cfg_buf_pools );
 }
@@ -91,15 +94,8 @@ void app_task( uint32_t arg )
 {
     while( 1 )
     {
-    	if( GPIO_PIN_OUTPUT_HIGH == wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) )
-    	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
-    	}
-    	else
-    	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
-    	}
-
+        wiced_hal_gpio_set_pin_output(LED1, !wiced_hal_gpio_get_pin_output(LED1) );
+		
         /* Send the thread to sleep for a specified number of milliseconds */
         wiced_rtos_delay_milliseconds( SLEEP_250MS, ALLOW_THREAD_TO_SLEEP );
     }

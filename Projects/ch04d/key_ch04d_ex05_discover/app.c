@@ -15,6 +15,7 @@
 
 #define MAX_ADV_NAME_LEN				(30)
 
+#define SEARCH_DEVICE_NAME "key_peri"			/* Name of device to search for */
 
 /*******************************************************************
  * Function Prototypes
@@ -31,7 +32,6 @@ void					startServiceDiscovery( void );
 void					startCharacteristicDiscovery( void );
 void					startDescriptorDiscovery( void );
 
-
 /*******************************************************************
  * Global/Static Variables
  ******************************************************************/
@@ -39,12 +39,12 @@ uint16_t connection_id = 0;
 uint16_t ledHandle = 0x0009u;		/* Check this matches your peripheral HDLC_MODUS_RGBLED_VALUE */
 uint16_t cccdHandle = 0x000Cu;		/* Check this matches your peripheral HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG */
 
-#define __UUID_SERVICE_MODUS                        0x0Au, 0x71u, 0x06u, 0xCAu, 0x27u, 0x68u, 0x44u, 0x8Du, 0xECu, 0x47u, 0x76u, 0x07u, 0x6Eu, 0x82u, 0x91u, 0x79u
-#define __UUID_CHARACTERISTIC_MODUS_RGBLED          0x74u, 0x66u, 0xB9u, 0x3Cu, 0x38u, 0x7Du, 0xADu, 0x99u, 0x74u, 0x46u, 0x9Du, 0x81u, 0x95u, 0x05u, 0xAAu, 0x02u
-#define __UUID_CHARACTERISTIC_MODUS_COUNTER         0x68u, 0xB9u, 0xECu, 0x13u, 0xEBu, 0x9Fu, 0x7Bu, 0x96u, 0x89u, 0x45u, 0x69u, 0x0Au, 0x63u, 0xB2u, 0xA5u, 0xFCu
-#define __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION    0x2902u
+#define __UUID_SERVICE_BT101                        0x0Au, 0x71u, 0x06u, 0xCAu, 0x27u, 0x68u, 0x44u, 0x8Du, 0xECu, 0x47u, 0x76u, 0x07u, 0x6Eu, 0x82u, 0x91u, 0x79u
+#define __UUID_CHARACTERISTIC_BT101_LED             0x74u, 0x66u, 0xB9u, 0x3Cu, 0x38u, 0x7Du, 0xADu, 0x99u, 0x74u, 0x46u, 0x9Du, 0x81u, 0x95u, 0x05u, 0xAAu, 0x02u
+#define __UUID_CHARACTERISTIC_BT101_COUNTER         0x68u, 0xB9u, 0xECu, 0x13u, 0xEBu, 0x9Fu, 0x7Bu, 0x96u, 0x89u, 0x45u, 0x69u, 0x0Au, 0x63u, 0xB2u, 0xA5u, 0xFCu
+#define __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION    0x2902
 
-static const uint8_t serviceUUID[] = { __UUID_SERVICE_MODUS };
+static const uint8_t serviceUUID[] = { __UUID_SERVICE_BT101};
 static uint16_t serviceStartHandle = 0x0001;
 static uint16_t serviceEndHandle   = 0xFFFF;
 
@@ -56,16 +56,15 @@ typedef struct
     uint16_t cccdHandle;
 } charHandle_t;
 
-static const uint8_t ledUUID[] = { __UUID_CHARACTERISTIC_MODUS_RGBLED };
+static const uint8_t ledUUID[] = { __UUID_CHARACTERISTIC_BT101_LED };
 static charHandle_t  ledChar;
 
-static const uint8_t counterUUID[] = { __UUID_CHARACTERISTIC_MODUS_COUNTER };
+static const uint8_t counterUUID[] = { __UUID_CHARACTERISTIC_BT101_COUNTER };
 static charHandle_t  counterChar;
 
 #define MAX_CHARS_DISCOVERED (10)
 static charHandle_t charHandles[MAX_CHARS_DISCOVERED];
 static uint32_t charHandleCount;
-
 
 /*******************************************************************************
 * Function Name: void application_start( void )
@@ -161,140 +160,146 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 	return status;
 }
 
+
+/*******************************************************************************
+* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback( 
+*					wiced_bt_gatt_evt_t event,
+*					wiced_bt_gatt_event_data_t *p_event_data )
+********************************************************************************/
 wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
 {
 	wiced_result_t status = WICED_BT_SUCCESS;
     wiced_bt_gatt_connection_status_t *p_conn = &p_event_data->connection_status;
 
-	switch( event )
-	{
-		case GATT_CONNECTION_STATUS_EVT:
-			if( p_conn->connected )
-			{
-				WICED_BT_TRACE( "Connected.\r\n" );
-				connection_id = p_conn->conn_id;
-				wiced_bt_dev_sec_bond(p_conn->bd_addr, p_conn->addr_type, BT_TRANSPORT_LE, 0, NULL );
-			}
-			else
-			{
-				WICED_BT_TRACE( "Disconnected.\r\n" );
-				connection_id = 0;
-			}
-			break;
+    switch( event )
+    	{
+    		case GATT_CONNECTION_STATUS_EVT:
+    			if( p_conn->connected )
+    			{
+    				WICED_BT_TRACE( "Connected.\r\n" );
+    				connection_id = p_conn->conn_id;
+    				wiced_bt_dev_sec_bond(p_conn->bd_addr, p_conn->addr_type, BT_TRANSPORT_LE, 0, NULL );
+    			}
+    			else
+    			{
+    				WICED_BT_TRACE( "Disconnected.\r\n" );
+    				connection_id = 0;
+    			}
+    			break;
 
-		case GATT_OPERATION_CPLT_EVT:
-			// When you get something back from the peripheral... print it out.. and all of its data
-			WICED_BT_TRACE("Gatt Event Complete Conn=%d Op=%d status=0x%X Handle=0x%X len=%d",
-					p_event_data->operation_complete.conn_id,
-					p_event_data->operation_complete.op,
-					p_event_data->operation_complete.status,
-					p_event_data->operation_complete.response_data.handle,
-					p_event_data->operation_complete.response_data.att_value.len);
+    		case GATT_OPERATION_CPLT_EVT:
+    			// When you get something back from the peripheral... print it out.. and all of its data
+    			WICED_BT_TRACE("Gatt Event Complete Conn=%d Op=%d status=0x%X Handle=0x%X len=%d",
+    					p_event_data->operation_complete.conn_id,
+    					p_event_data->operation_complete.op,
+    					p_event_data->operation_complete.status,
+    					p_event_data->operation_complete.response_data.handle,
+    					p_event_data->operation_complete.response_data.att_value.len);
 
-			if( p_event_data->operation_complete.response_data.att_value.len > 0 )
-			{
-				WICED_BT_TRACE_ARRAY( p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len, "Data: " );
-			}
-			else
-			{
-				WICED_BT_TRACE( "\r\n" );
-			}
-			break;
+    			if( p_event_data->operation_complete.response_data.att_value.len > 0 )
+    			{
+    				WICED_BT_TRACE_ARRAY( p_event_data->operation_complete.response_data.att_value.p_data, p_event_data->operation_complete.response_data.att_value.len, "Data: " );
+    			}
+    			else
+    			{
+    				WICED_BT_TRACE( "\r\n" );
+    			}
+    			break;
 
-		case GATT_DISCOVERY_RESULT_EVT:
-			//////////////// Services Discovery /////////////////
-			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_SERVICES_BY_UUID )
-	        {
-				serviceStartHandle = GATT_DISCOVERY_RESULT_SERVICE_START_HANDLE( p_event_data );
-				serviceEndHandle = GATT_DISCOVERY_RESULT_SERVICE_END_HANDLE( p_event_data );
-				WICED_BT_TRACE( "Discovered Service Start=%X End=%X\r\n", serviceStartHandle, serviceEndHandle );
-	        }
+    		case GATT_DISCOVERY_RESULT_EVT:
+    			//////////////// Services Discovery /////////////////
+    			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_SERVICES_BY_UUID )
+    	        {
+    				serviceStartHandle = GATT_DISCOVERY_RESULT_SERVICE_START_HANDLE( p_event_data );
+    				serviceEndHandle = GATT_DISCOVERY_RESULT_SERVICE_END_HANDLE( p_event_data );
+    				WICED_BT_TRACE( "Discovered Service Start=%X End=%X\r\n", serviceStartHandle, serviceEndHandle );
+    	        }
 
 
-			//////////////// Characteristics Discovery /////////////////
-			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_CHARACTERISTICS )
-			{
-				charHandles[charHandleCount].startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle;
-				charHandles[charHandleCount].valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
-				charHandles[charHandleCount].endHandle = serviceEndHandle;
+    			//////////////// Characteristics Discovery /////////////////
+    			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_CHARACTERISTICS )
+    			{
+    				charHandles[charHandleCount].startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle;
+    				charHandles[charHandleCount].valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
+    				charHandles[charHandleCount].endHandle = serviceEndHandle;
 
-				WICED_BT_TRACE( "Char Handle=0x%X Value Handle=0x%X Len=%d ",
-							charHandles[charHandleCount].startHandle,
-							charHandles[charHandleCount].valHandle,
-							GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data ),
-							GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID_LEN( p_event_data ) );
+    				WICED_BT_TRACE( "Char Handle=0x%X Value Handle=0x%X Len=%d ",
+    							charHandles[charHandleCount].startHandle,
+    							charHandles[charHandleCount].valHandle,
+    							GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data ),
+    							GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID_LEN( p_event_data ) );
 
-				if( charHandleCount != 0 )
-				{
-					charHandles[charHandleCount-1].endHandle = charHandles[charHandleCount].endHandle - 1;
-				}
-				charHandleCount += 1;
+    				if( charHandleCount != 0 )
+    				{
+    					charHandles[charHandleCount-1].endHandle = charHandles[charHandleCount].endHandle - 1;
+    				}
+    				charHandleCount += 1;
 
-				if( charHandleCount > MAX_CHARS_DISCOVERED-1 )
-				{
-					WICED_BT_TRACE( "This is really bad.. we discovered more characteristics than we can save\r\n" );
-				}
+    				if( charHandleCount > MAX_CHARS_DISCOVERED-1 )
+    				{
+    					WICED_BT_TRACE( "This is really bad.. we discovered more characteristics than we can save\r\n" );
+    				}
 
-				if( memcmp( ledUUID, GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data ), 16 ) == 0 ) // If it is the led Characteristic
-				{
-					ledChar.startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle; // No macro for this unfortunately
-					ledChar.valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
-				}
+    				if( memcmp( ledUUID, GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data ), 16 ) == 0 ) // If it is the led Characteristic
+    				{
+    					ledChar.startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle; // No macro for this unfortunately
+    					ledChar.valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
+    				}
 
-				if( memcmp( counterUUID, GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data ),16 ) == 0 ) // If it is the button Characteristic
-				{
-					counterChar.startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle; // No macro for this unfortunately
-					counterChar.valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
-				}
+    				if( memcmp( counterUUID, GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data ),16 ) == 0 ) // If it is the button Characteristic
+    				{
+    					counterChar.startHandle = p_event_data->discovery_result.discovery_data.characteristic_declaration.handle; // No macro for this unfortunately
+    					counterChar.valHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_VALUE_HANDLE( p_event_data );
+    				}
 
-				for (int i=0; i<GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID_LEN( p_event_data ); i++ ) // Dump the bytes to the screen
-				{
-					WICED_BT_TRACE( "%02X ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data )[i] );
-				}
-				WICED_BT_TRACE( "\r\n" );
-	        }
+    				for (int i=0; i<GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID_LEN( p_event_data ); i++ ) // Dump the bytes to the screen
+    				{
+    					WICED_BT_TRACE( "%02X ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_UUID128( p_event_data )[i] );
+    				}
+    				WICED_BT_TRACE( "\r\n" );
+    	        }
 
-			//////////////// Descriptors Discovery /////////////////
-			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_CHARACTERISTIC_DESCRIPTORS )
-			{
-				WICED_BT_TRACE( "Char Descriptor Handle = %X Len=%d ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_VALUE_HANDLE( p_event_data ),
-				GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID_LEN( p_event_data ) );
+    			//////////////// Descriptors Discovery /////////////////
+    			if( p_event_data->discovery_result.discovery_type == GATT_DISCOVER_CHARACTERISTIC_DESCRIPTORS )
+    			{
+    				WICED_BT_TRACE( "Char Descriptor Handle = %X Len=%d ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_VALUE_HANDLE( p_event_data ),
+    				GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID_LEN( p_event_data ) );
 
-				for( int i=0; i<GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID_LEN( p_event_data ); i++ )
-				{
-					WICED_BT_TRACE( "%02X ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID128( p_event_data )[i] );
-				}
-				WICED_BT_TRACE( "\r\n" );
+    				for( int i=0; i<GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID_LEN( p_event_data ); i++ )
+    				{
+    					WICED_BT_TRACE( "%02X ", GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID128( p_event_data )[i] );
+    				}
+    				WICED_BT_TRACE( "\r\n" );
 
-				if( GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID16( p_event_data ) == __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION )
-				{
-					counterChar.cccdHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_VALUE_HANDLE( p_event_data );
-				}
-			}
-			break;
+    				if( GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_UUID16( p_event_data ) == __UUID_DESCRIPTOR_CLIENT_CHARACTERISTIC_CONFIGURATION )
+    				{
+    					counterChar.cccdHandle = GATT_DISCOVERY_RESULT_CHARACTERISTIC_DESCRIPTOR_VALUE_HANDLE( p_event_data );
+    				}
+    			}
+    			break;
 
-		case GATT_DISCOVERY_CPLT_EVT:
-			// Once all characteristics are discovered... you need to setup the end handles
-			if( p_event_data->discovery_complete.disc_type == GATT_DISCOVER_CHARACTERISTICS )
-			{
-			  for( int i=0; i<charHandleCount; i++ )
-			  {
-			    if( charHandles[i].startHandle == ledChar.startHandle )
-			      ledChar.endHandle = charHandles[i].endHandle;
+    		case GATT_DISCOVERY_CPLT_EVT:
+    			// Once all characteristics are discovered... you need to setup the end handles
+    			if( p_event_data->discovery_complete.disc_type == GATT_DISCOVER_CHARACTERISTICS )
+    			{
+    			  for( int i=0; i<charHandleCount; i++ )
+    			  {
+    			    if( charHandles[i].startHandle == ledChar.startHandle )
+    			      ledChar.endHandle = charHandles[i].endHandle;
 
-			    if( charHandles[i].startHandle == counterChar.startHandle )
-			       counterChar.endHandle = charHandles[i].endHandle;
-			  }
-			}
-			break;
+    			    if( charHandles[i].startHandle == counterChar.startHandle )
+    			       counterChar.endHandle = charHandles[i].endHandle;
+    			  }
+    			}
+    			break;
 
-		default:
-			WICED_BT_TRACE( "Unhandled GATT Event: 0x%x (%d)\n", event, event );
-			break;
-	}
+    		default:
+    			WICED_BT_TRACE( "Unhandled GATT Event: 0x%x (%d)\n", event, event );
+    			break;
+    	}
 
-	return status;
-}
+    	return status;
+    }
 
 
 /*******************************************************************************
@@ -311,6 +316,7 @@ void uart_rx_callback( void *data )
 	switch( readbyte )
 	{
 		case 's':			// Turn on scanning
+			WICED_BT_TRACE( "Searching for \"%s\"\r\n", SEARCH_DEVICE_NAME );
 			wiced_bt_ble_scan( BTM_BLE_SCAN_TYPE_HIGH_DUTY, WICED_TRUE, myScanCallback );
 			break;
 
@@ -322,23 +328,12 @@ void uart_rx_callback( void *data )
 	        wiced_bt_gatt_disconnect( connection_id );
 			break;
 
-		case '0':			// LEDs off
-		case '1':			// LEDs blue
-		case '2':			// LEDs red
-		case '3':			// LEDs blue+red
-		case '4':			// LEDs green
-		case '5':			// LEDs blue+green
-		case '6':			// LEDs red+green
-		case '7':			// LEDs white
-			writeLED( readbyte );
+		case 'n': /* Notifications on */
+			writeCCCD( 1 );
 			break;
 
-		case 'n':
-			writeCCCD( 0x01 );
-			break;
-
-		case 'N':
-			writeCCCD( 0x00 );
+		case 'N': /* Notifications off */
+			writeCCCD( 0 );
 			break;
 
 		case 'q':
@@ -353,8 +348,19 @@ void uart_rx_callback( void *data )
 			startDescriptorDiscovery();
 			break;
 
+		case '0':			// LEDs off
+		case '1':			// LEDs blue
+		case '2':			// LEDs red
+		case '3':			// LEDs blue+red
+		case '4':			// LEDs green
+		case '5':			// LEDs blue+green
+		case '6':			// LEDs red+green
+		case '7':			// LEDs white
+			writeLED( readbyte - '0' );
+			break;
+
 		default:
-			WICED_BT_TRACE( "Unrecognised command\r\n" );
+			WICED_BT_TRACE( "Unrecognized command\r\n" );
 			// No break - fall through and display help
 
 		case '?':			// Help
@@ -363,9 +369,9 @@ void uart_rx_callback( void *data )
 			WICED_BT_TRACE( "\t%c\tStart scanning\r\n", 's' );
 			WICED_BT_TRACE( "\t%c\tStop scanning\r\n", 'S' );
 			WICED_BT_TRACE( "\t%c\tDisconnect\r\n", 'd' );
+			WICED_BT_TRACE( "\t%c\tTurn Notifications On\r\n", 'n' );
+			WICED_BT_TRACE( "\t%c\tTurn Notifications Off\r\n", 'N' );
 			WICED_BT_TRACE( "\t%s\tControl LED\r\n", "0..7" );
-			WICED_BT_TRACE( "\t%c\tStart notifications\r\n", 'n' );
-			WICED_BT_TRACE( "\t%c\tStop notifications\r\n", 'N' );
 			WICED_BT_TRACE( "\t%c\tStart Service Discovery\r\n", 'q' );
 			WICED_BT_TRACE( "\t%c\tSttart Characteristic Discovery\r\n", 'w' );
 			WICED_BT_TRACE( "\t%c\tStart Descriptor Discovery\r\n", 'e' );
@@ -383,30 +389,23 @@ void uart_rx_callback( void *data )
 void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data )
 {
 	uint8_t len;
-	uint8_t *p_name = NULL;
-	uint8_t *p_service = NULL;
+	char *p_name = NULL;
+	char *p_service = NULL;
 
-	uint8_t dev_name[MAX_ADV_NAME_LEN];
+	char dev_name[MAX_ADV_NAME_LEN];
 
-	p_name = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_NAME_COMPLETE, &len );
+	p_name = (char *)wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_NAME_COMPLETE, &len );
 
-	if( p_name && ( len == strlen("key_peri") ) && (memcmp( "key_peri", p_name, len ) == 0) )
+	if( p_name && ( len == strlen(SEARCH_DEVICE_NAME) ) && (memcmp( SEARCH_DEVICE_NAME, p_name, len ) == 0) )
 	{
-		memcpy( dev_name, p_name, len);
-		dev_name[len] = 0x00;	/* Null terminate the string */
+		strncpy( dev_name, p_name, len );
+		dev_name[len] = '\0';				// Null terminate the string
+		WICED_BT_TRACE("Found Device Name \"%s\" with BD Address: [%B] ", dev_name, p_scan_result->remote_bd_addr );
 
-		WICED_BT_TRACE("Found Device %s with BD Address: [%B] ", dev_name, p_scan_result->remote_bd_addr );
+		wiced_bool_t xx = wiced_bt_gatt_le_connect( p_scan_result->remote_bd_addr, p_scan_result->ble_addr_type, BLE_CONN_MODE_HIGH_DUTY, WICED_TRUE );
 
-
-		p_service = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
-		if( p_service && len > 0 )
-		{
-			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
-		}
-
-		/* Connect and turn off scanning */
-		wiced_bt_gatt_le_connect(p_scan_result->remote_bd_addr, p_scan_result->ble_addr_type, BLE_CONN_MODE_HIGH_DUTY, WICED_TRUE);
 		wiced_bt_ble_scan( BTM_BLE_SCAN_TYPE_NONE, WICED_TRUE, myScanCallback );
+
 	}
 }
 
@@ -416,7 +415,7 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 ********************************************************************************/
 void writeLED( uint8_t val )
 {
-	if( connection_id )
+	if( connection_id && ledHandle )
 	{
 		wiced_bt_gatt_value_t *p_write = ( wiced_bt_gatt_value_t* )wiced_bt_get_buffer( sizeof( wiced_bt_gatt_value_t ) + sizeof( val )-1 );
 
@@ -445,7 +444,7 @@ void writeCCCD( uint8_t val )
 {
 	if( connection_id && cccdHandle )
 	{
-		wiced_bt_util_set_gatt_client_config_descriptor( connection_id, cccdHandle, val );
+		wiced_bt_util_set_gatt_client_config_descriptor(connection_id, cccdHandle, val);
 	}
 }
 

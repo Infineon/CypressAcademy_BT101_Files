@@ -56,8 +56,8 @@
 static wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
 static wiced_bt_gatt_status_t	app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_data );
 
-wiced_bt_gatt_status_t			app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr );
-wiced_bt_gatt_status_t			app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr );
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data );
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data );
 
 void							app_set_advertisement_data( void );
 
@@ -135,8 +135,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 				WICED_BT_TRACE( "Bluetooth Enabled\r\n" );
 				
 				/*Configure the PWM*/
-				wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_LED_1, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
-				wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_1, WICED_PWM0);
+				wiced_hal_gpio_configure_pin(LED1, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+				wiced_hal_gpio_select_function(LED1, WICED_PWM0);
 
 				/* Use Application Settings dialog to set BT_DEVICE_ADDRESS = random */
 				wiced_bt_device_address_t bda;
@@ -181,8 +181,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 			    wiced_hal_puart_enable_rx();
 
 				/* Configure the button to trigger an interrupt when pressed */
-				wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_BUTTON_1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
-				wiced_hal_gpio_register_pin_for_interrupt( WICED_GPIO_PIN_BUTTON_1, button_cback, 0 );
+				wiced_hal_gpio_configure_pin(USER_BUTTON1, ( GPIO_INPUT_ENABLE | GPIO_PULL_UP | GPIO_EN_INT_FALLING_EDGE ), GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_register_pin_for_interrupt( USER_BUTTON1, button_cback, 0 );
 
 				/* Create the packet and begin advertising */
 				app_set_advertisement_data();
@@ -251,8 +251,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 	            {
 	                hostinfo.cccd[0] = hostinfoTemp.cccd[0];  /* Copy in the cccd value from the temporary holding location */
 	                hostinfo.cccd[1] = hostinfoTemp.cccd[1];
-	                app_modus_counter_client_char_config[0] = hostinfo.cccd[0]; /* Set CCCD value from the value that was previously saved in the NVRAM */
-	                app_modus_counter_client_char_config[1] = hostinfo.cccd[1];
+	                app_bt101_counter_client_char_config[0] = hostinfo.cccd[0]; /* Set CCCD value from the value that was previously saved in the NVRAM */
+	                app_bt101_counter_client_char_config[1] = hostinfo.cccd[1];
 	                bondIndex = count; /* Remember which NVRAM slot belongs to the currently connected device */
 	                WICED_BT_TRACE("\tRestored existing bonded device info from NVRAM %B result: %d \n\r", hostinfo.bdaddr);
 	                break; /* Exit out of loop since we found what we need */
@@ -404,8 +404,8 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 
 	            /* Reset the CCCD value so that on a reconnect CCCD will be off */
 	            memset( &hostinfo.bdaddr, 0, sizeof( BD_ADDR ) );
-	            app_modus_counter_client_char_config[0] = 0;
-	            app_modus_counter_client_char_config[1] = 0;
+	            app_bt101_counter_client_char_config[0] = 0;
+	            app_bt101_counter_client_char_config[1] = 0;
 
 				/* Restart the advertisements */
 				wiced_bt_start_advertisements( BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL );
@@ -416,11 +416,11 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 			switch( p_attr->request_type )
 			{
 				case GATTS_REQ_TYPE_READ:
-					result = app_gatt_get_value( p_attr );
+					result = app_gatt_get_value( &(p_attr->data.read_req) );
 					break;
 
 				case GATTS_REQ_TYPE_WRITE:
-					result = app_gatt_set_value( p_attr );
+					result = app_gatt_set_value( &(p_attr->data.write_req) );
 					break;
             }
             break;
@@ -462,64 +462,79 @@ void app_set_advertisement_data( void )
 
 /*******************************************************************************
 * Function Name: app_gatt_get_value(
-* 					wiced_bt_gatt_attribute_request_t *p_attr )
+* 					wiced_bt_gatt_read_t *p_data )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.read_req.p_val;
-	uint16_t *p_len = 		p_attr->data.read_req.p_val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t *p_len = 		p_data->p_val_len;
+	uint16_t  offset =		p_data->offset;
 
-    int i = 0;
+	int i = 0;
+	int len_to_copy;
+
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
     // Check for a matching handle entry
     for (i = 0; i < app_gatt_db_ext_attr_tbl_size; i++)
     {
-        if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
+    	// Search for a matching handle in the external lookup table
+    	if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in the external lookup table
-            if (app_gatt_db_ext_attr_tbl[i].cur_len <= *p_len)
-            {
-                // Value fits within the supplied buffer; copy over the value
-                *p_len = app_gatt_db_ext_attr_tbl[i].cur_len;
-                memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data, app_gatt_db_ext_attr_tbl[i].cur_len);
-                res = WICED_BT_GATT_SUCCESS;
+            /* Start by assuming we will copy entire value */
+    		len_to_copy = app_gatt_db_ext_attr_tbl[i].cur_len;
 
-                // TODO: Add code for any action required when this attribute is read
-                switch ( attr_handle )
-                {
+    		/* Offset is beyond the end of the actual data length, nothing to do*/
+    		if ( offset >= len_to_copy)
+    		{
+    			return WICED_BT_GATT_INVALID_OFFSET;
+    		}
+
+    		/* Only need to copy from offset to the end */
+    		len_to_copy = len_to_copy - offset;
+
+    		/* Determine if there is enough space to copy the entire value.
+    		 * If not, only copy as much as will fit. */
+            if (len_to_copy > *p_len)
+            {
+            	len_to_copy = *p_len;
+            }
+
+			/* Tell the stack how much will be copied to the buffer and then do the copy */
+			*p_len = len_to_copy;
+			memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data + offset, len_to_copy);
+			res = WICED_BT_GATT_SUCCESS;
+
+            // TODO: Add code for any action required when this attribute is read
+            switch ( attr_handle )
+            {
 //					case handle:
 //						break;
-                }
             }
-            else
-            {
-                // Value to read will not fit within the buffer
-                res = WICED_BT_GATT_INVALID_ATTR_LEN;
-            }
-            break;
-        }
+			break; /* break out of for loop once matching handle is found */
+       }
     }
-
     return res;
 }
 
+
 /*******************************************************************************
 * Function Name: app_gatt_set_value(
-*					wiced_bt_gatt_attribute_request_t *p_attr )
+*					wiced_bt_gatt_write_t *p_data )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.write_req.p_val;
-	uint16_t len = 			p_attr->data.write_req.val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t len = 			p_data->val_len;
 
-    int i = 0;
+	int i = 0;
     wiced_bool_t validLen = WICED_FALSE;
+
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
-    // Check for a matching handle entry
+    // Check for a matching handle entry and find is max available size
     for (i = 0; i < app_gatt_db_ext_attr_tbl_size; i++)
     {
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
@@ -537,7 +552,7 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
-                	case HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG:
+                	case HDLD_BT101_COUNTER_CLIENT_CHAR_CONFIG:
                 		if ( len != 2 )
                 		{
                 			return WICED_BT_GATT_INVALID_ATTR_LEN;
@@ -556,7 +571,7 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // Value to write does not meet size constraints
                 res = WICED_BT_GATT_INVALID_ATTR_LEN;
             }
-            break;
+            break; /* break out of for loop once matching handle is found */
         }
     }
 
@@ -568,22 +583,22 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 ********************************************************************************/
 void button_cback( void *data, uint8_t port_pin )
 {
-    app_modus_counter[0]++;
+    app_bt101_counter[0]++;
 
     if( connection_id )
     {
-    	if( app_modus_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
+    	if( app_bt101_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
     	{
     		wiced_bt_gatt_send_notification(
 				connection_id,
-				HDLC_MODUS_COUNTER_VALUE,
-				app_modus_counter_len,
-				app_modus_counter );
+				HDLC_BT101_COUNTER_VALUE,
+				app_bt101_counter_len,
+				app_bt101_counter );
     	}
     }
 
     /* Clear the GPIO interrupt */
-    wiced_hal_gpio_clear_pin_interrupt_status( WICED_GPIO_PIN_BUTTON_1 );
+    wiced_hal_gpio_clear_pin_interrupt_status( USER_BUTTON1 );
 }
 
 
@@ -605,10 +620,10 @@ void rx_cback( void *data )
     wiced_hal_puart_read( &readbyte );
     wiced_hal_puart_reset_puart_interrupt();
 
-    /* Remove bonding info if the user sends 'e' */
-    if( readbyte == 'e' )
+    /* Enter bonding mode if the user sends 'b' */
+    if( readbyte == 'b' )
     {
-        if(bonded == WICED_TRUE) /* Enter bond mode */
+        if(bonded == WICED_TRUE)
          {
              /* Check to see if we need to erase one of the existing devices */
              if(bondInfo[NUM_BONDED] == BOND_MAX)

@@ -1,5 +1,5 @@
 #
-# Copyright 2019, Cypress Semiconductor Corporation or a subsidiary of
+# Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
 # Cypress Semiconductor Corporation. All Rights Reserved.
 #
 # This software, including source code, documentation and related
@@ -45,44 +45,34 @@ VERBOSE=
 
 # default target
 TARGET=CYW920819EVB-02
+
 SUPPORTED_TARGETS = \
   CYW920819EVB-02 \
   CYW920820EVB-02 \
   CYBT-213043-EVAL \
-  CYBT-213043-MESH \
   CYW989820EVB-01 \
-  CYW920721B2EVK-01 \
   CYW920721B2EVK-03 \
-  CYW920719B2Q40EVB-01
-
-TARGET_DEVICE_MAP = \
-  CYW920819EVB-02/20819A1 \
-  CYW920820EVB-02/20820A1 \
-  CYBT-213043-EVAL/20819A1 \
-  CYBT-213043-MESH/20819A1 \
-  CYW989820EVB-01/20820A1 \
-  CYW920721B2EVK-01/20721B2 \
-  CYW920721B2EVK-03/20721B2 \
-  CYW920719B2Q40EVB-01/20719B2
-
-CY_TARGET_DEVICE = $(patsubst $(TARGET)/%,%,$(filter $(TARGET)%,$(TARGET_DEVICE_MAP)))
-
-ifeq ($(filter $(TARGET),$(SUPPORTED_TARGETS)),)
-$(error TARGET $(TARGET) not supported for this code example)
-endif
+  CYW920721B2EVK-02 \
+  CYW920719B2Q40EVB-01 \
+  CYW920706WCDEVAL \
+  CYBT-353027-EVAL \
+  CYBT-343026-EVAL \
+  CYW920735Q60EVB-01 \
+  CYW9M2BASE-43012BT \
+  CYBT-423054-EVAL \
+  CYBT-413055-EVAL \
+  CYBT-483056-EVAL \
+  CYBT-213043-MESH \
+  CYW920835REF-RCU-01 \
+  CYBT-423060-EVAL \
+  CYBT-413061-EVAL \
+  CYBT-483062-EVAL
 
 #
 # Advanced Configuration
 #
 SOURCES=
-INCLUDES=\
-    $(CY_BASELIB_PATH)/include \
-    $(CY_BASELIB_PATH)/include/hal \
-    $(CY_BASELIB_PATH)/include/internal \
-    $(CY_BASELIB_PATH)/include/stack \
-    $(CY_BASELIB_PATH)/internal/$(CY_TARGET_DEVICE) \
-    $(CY_SHARED_PATH)/dev-kit/btsdk-include \
-    $(CY_BSP_PATH)
+INCLUDES=
 DEFINES=
 VFP_SELECT=
 CFLAGS=
@@ -116,9 +106,7 @@ CY_APP_DEFINES+=\
 #
 # Components (middleware libraries)
 #
-COMPONENTS += bsp_design_modus
-COMPONENTS += my_design_modus
-DISABLE_COMPONENTS += bsp_design_modus
+COMPONENTS +=custom_design_modus
 
 ################################################################################
 # Paths
@@ -127,20 +115,18 @@ DISABLE_COMPONENTS += bsp_design_modus
 # Path (absolute or relative) to the project
 CY_APP_PATH=.
 
-# Path (absolute or relative) to the bt-sdk folder (at repo root)
-CY_SHARED_PATH=$(CY_APP_PATH)/../wiced_btsdk
-CY_SHARED_PATH_ABS=$(CURDIR)/../wiced_btsdk
+# Relative path to the shared repo location.
+#
+# All .mtb files have the format, <URI><COMMIT><LOCATION>. If the <LOCATION> field
+# begins with $$ASSET_REPO$$, then the repo is deposited in the path specified by
+# the CY_GETLIBS_SHARED_PATH variable. The default location is one directory level
+# above the current app directory.
+# This is used with CY_GETLIBS_SHARED_NAME variable, which specifies the directory name.
+CY_GETLIBS_SHARED_PATH=../
 
-# Path (absolute or relative) to the base library
-CY_BASELIB_PATH=$(CY_SHARED_PATH)/dev-kit/baselib/$(CY_TARGET_DEVICE)
-
-# Path to the bsp library
-CY_BSP_PATH=$(CY_SHARED_PATH)/dev-kit/bsp/TARGET_$(TARGET)
-
-INCLUDES+=\
-    $(CY_BASELIB_PATH)/WICED/common
-
-CY_DEVICESUPPORT_PATH=$(CY_BASELIB_PATH)
+# Directory name of the shared repo location.
+#
+CY_GETLIBS_SHARED_NAME=mtb_shared
 
 # Absolute path to the compiler (Default: GCC in the tools)
 CY_COMPILER_PATH=
@@ -167,72 +153,11 @@ ifeq ($(CY_TOOLS_DIR),)
 $(error Unable to find any of the available CY_TOOLS_PATHS -- $(CY_TOOLS_PATHS))
 endif
 
-# path to WICED tools root folder
-CY_WICED_TOOLS_ROOT?=$(CY_SHARED_PATH)/dev-kit/btsdk-tools
-
 # tools that can be launched with "make open CY_OPEN_TYPE=<tool>
-CY_BT_APP_TOOLS=
+CY_BT_APP_TOOLS=BTSpy ClientControl
 
-# getlibs path
-CY_GETLIBS_PATH=.
-
-# paths to shared_libs targets
-SEARCH_LIBS_AND_INCLUDES=$(CY_BSP_PATH) $(CY_BASELIB_PATH)
-
-# common make arguments for lib builds
-MAKE_OVERRIDES=OTA_FW_UPGRADE=$(OTA_FW_UPGRADE)
-export CONFIG
-export COMPONENTS
-export DISABLE_COMPONENTS
-CY_SHARED_LIB_ARGS:=$(MAKECMDGOALS) $(MAKE_OVERRIDES) CY_APP_DEFINES+="$(CY_APP_DEFINES)" CY_TARGET_DEVICE=$(CY_TARGET_DEVICE) TARGET=$(TARGET)
-
-.PHONY: $(SEARCH_LIBS_AND_INCLUDES) shared_libs
-
-# recursive make on each shared_lib project
-shared_libs: $(SEARCH_LIBS_AND_INCLUDES)
-$(SEARCH_LIBS_AND_INCLUDES):
-	$(MAKE) -C $@ $(CY_SHARED_LIB_ARGS)
-
-CY_APP_LOCATION=$(lastword $(MAKEFILE_LIST))
-
-CY_APP_BUILD_GOALS:=build qbuild clean program qprogram debug qdebug all
 -include internal.mk
-ifeq ($(filter setup teardown,$(MAKECMDGOALS)),)
-
-# ensure pre-requisite wiced_btsdk project is present
-ifeq ($(wildcard $(CY_SHARED_PATH)),)
-# if not present, IDE will be trying to run make eclipse to get launch configuration
-# need to store in that case and re-run later after the wiced_btsdk project exists
-ifeq ($(MAKECMDGOALS),eclipse)
-$(shell echo $(CY_IDE_PRJNAME) > ./.cy_ide_prjname)
-endif
-ifneq ($(filter eclipse $(CY_APP_BUILD_GOALS),$(MAKECMDGOALS)),)
-$(warning BTSDK application projects require the wiced_btsdk project as a prerequisite.)
-$(warning Please create the wiced_btsdk project via New Application wizard in the IDE or via git clone for CLI.)
-$(error Missing prerequisite wiced_btsdk project)
-endif
-endif
-
-# ensure that the wiced_btsdk project has performed getlibs to populate the assets (CLI only)
-ifneq ($(filter $(CY_APP_BUILD_GOALS),$(MAKECMDGOALS)),)
-ifeq ($(wildcard $(CY_BASELIB_PATH)),)
-$(warning Prerequisite baselib path $(CY_BASELIB_PATH) not found under wiced_btsdk project.)
-$(warning Please perform 'make getlibs' in the $(CY_SHARED_PATH) folder.)
-$(error Missing prerequisite $(CY_BASELIB_PATH))
-endif
-endif
-
-# all prerequisites satisfied, check for .cy_ide_prjname if stored earlier
-ifeq ($(CY_MAKE_IDE),eclipse)
-ifneq ($(filter $(CY_APP_BUILD_GOALS),$(MAKECMDGOALS)),)
-ifneq ($(wildcard ./.cy_ide_prjname),)
-CY_IDE_PRJNAME=`cat ./.cy_ide_prjname`
-$(MAKECMDGOALS): regenerate_launches
-regenerate_launches:
-	@make -C . eclipse CY_IDE_PRJNAME=$(CY_IDE_PRJNAME)
-	@rm ./.cy_ide_prjname
-endif
-endif
+ifeq ($(filter $(TARGET),$(SUPPORTED_TARGETS)),)
+$(error TARGET $(TARGET) not supported for this code example)
 endif
 include $(CY_TOOLS_DIR)/make/start.mk
-endif

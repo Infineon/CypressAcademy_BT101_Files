@@ -44,8 +44,8 @@
 static wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
 static wiced_bt_gatt_status_t	app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_data );
 
-wiced_bt_gatt_status_t			app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr );
-wiced_bt_gatt_status_t			app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr );
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data );
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data );
 
 void							app_set_advertisement_data( void );
 
@@ -109,9 +109,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 				
                 /* TODO Ex 02: Configure PWM */
 				/* Start the PWM in the LED always off state */
-				wiced_hal_gpio_configure_pin(WICED_GPIO_PIN_LED_1,
+				wiced_hal_gpio_configure_pin(LED1,
 						GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
-				wiced_hal_gpio_select_function(WICED_GPIO_PIN_LED_1, WICED_PWM0);
+				wiced_hal_gpio_select_function(LED1, WICED_PWM0);
 				wiced_hal_aclk_enable( PWM_FREQUENCY, ACLK1, ACLK_FREQ_24_MHZ );
 				wiced_hal_pwm_start( PWM0, PMU_CLK, PWM_ALWAYS_OFF, PWM_INIT, 0 );
 
@@ -224,11 +224,11 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 			switch( p_attr->request_type )
 			{
 				case GATTS_REQ_TYPE_READ:
-					result = app_gatt_get_value( p_attr );
+					result = app_gatt_get_value( &(p_attr->data.read_req) );
 					break;
 
 				case GATTS_REQ_TYPE_WRITE:
-					result = app_gatt_set_value( p_attr );
+					result = app_gatt_set_value( &(p_attr->data.write_req) );
 					break;
             }
             break;
@@ -271,65 +271,79 @@ void app_set_advertisement_data( void )
 
 /*******************************************************************************
 * Function Name: app_gatt_get_value(
-* 					wiced_bt_gatt_attribute_request_t *p_attr )
+* 					wiced_bt_gatt_read_t *p_data )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.read_req.p_val;
-	uint16_t *p_len = 		p_attr->data.read_req.p_val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t *p_len = 		p_data->p_val_len;
+	uint16_t  offset =		p_data->offset;
 
 	int i = 0;
+	int len_to_copy;
+
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
     // Check for a matching handle entry
     for (i = 0; i < app_gatt_db_ext_attr_tbl_size; i++)
     {
-        if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
+    	// Search for a matching handle in the external lookup table
+    	if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in the external lookup table
-            if (app_gatt_db_ext_attr_tbl[i].cur_len <= *p_len)
-            {
-                // Value fits within the supplied buffer; copy over the value
-                *p_len = app_gatt_db_ext_attr_tbl[i].cur_len;
-                memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data, app_gatt_db_ext_attr_tbl[i].cur_len);
-                res = WICED_BT_GATT_SUCCESS;
+            /* Start by assuming we will copy entire value */
+    		len_to_copy = app_gatt_db_ext_attr_tbl[i].cur_len;
 
-                // TODO Ex 01: Add code for any action required when this attribute is read
-                switch ( attr_handle )
-                {
+    		/* Offset is beyond the end of the actual data length, nothing to do*/
+    		if ( offset >= len_to_copy)
+    		{
+    			return WICED_BT_GATT_INVALID_OFFSET;
+    		}
+
+    		/* Only need to copy from offset to the end */
+    		len_to_copy = len_to_copy - offset;
+
+    		/* Determine if there is enough space to copy the entire value.
+    		 * If not, only copy as much as will fit. */
+            if (len_to_copy > *p_len)
+            {
+            	len_to_copy = *p_len;
+            }
+
+			/* Tell the stack how much will be copied to the buffer and then do the copy */
+			*p_len = len_to_copy;
+			memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data + offset, len_to_copy);
+			res = WICED_BT_GATT_SUCCESS;
+
+            // TODO Ex 01: Add code for any action required when this attribute is read
+            switch ( attr_handle )
+            {
 //					case handle:
 //						break;
-                }
             }
-            else
-            {
-                // Value to read will not fit within the buffer
-                res = WICED_BT_GATT_INVALID_ATTR_LEN;
-            }
-            break;
-        }
+			break; /* break out of for loop once matching handle is found */
+       }
     }
-
     return res;
 }
 
 
 /*******************************************************************************
 * Function Name: app_gatt_set_value(
-*					wiced_bt_gatt_attribute_request_t *p_attr )
+*					wiced_bt_gatt_write_t *p_data )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.write_req.p_val;
-	uint16_t len = 			p_attr->data.write_req.val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t len = 			p_data->val_len;
 
 	int i = 0;
     wiced_bool_t validLen = WICED_FALSE;
+
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
-    // Check for a matching handle entry
+    // Check for a matching handle entry and find is max available size
     for (i = 0; i < app_gatt_db_ext_attr_tbl_size; i++)
     {
         if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
@@ -357,7 +371,7 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // Value to write does not meet size constraints
                 res = WICED_BT_GATT_INVALID_ATTR_LEN;
             }
-            break;
+            break; /* break out of for loop once matching handle is found */
         }
     }
 

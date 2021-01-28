@@ -64,8 +64,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         {
             /* Initialize the UART */
             wiced_hal_puart_init();
+            wiced_hal_puart_configuration(115200, PARITY_NONE, STOP_BIT_1 );
             wiced_hal_puart_flow_off();
-            wiced_hal_puart_set_baudrate( 115200 );
             wiced_hal_puart_enable_tx();
 
             /* Enable receive and the interrupt */
@@ -101,15 +101,15 @@ void rx_cback( void *data )
     /* Turn LED ON/OFF bases on character received */
     if( readbyte == '1' )
     {
-        /* Drive LED HIGH */
-        wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_LOW );
+        /* Turn LED ON */
+        wiced_hal_gpio_set_pin_output( LED2, LED_STATE_ON );
         wiced_hal_puart_print( "LED_ON\n\r" );
     }
 
     if( readbyte == '0' )
     {
-        /* Drive LED LOW */
-         wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_HIGH );
+        /* Drive LED OFF */
+         wiced_hal_gpio_set_pin_output( LED2, LED_STATE_OFF );
          wiced_hal_puart_print( "LED_OFF\n\r" );
 
     }

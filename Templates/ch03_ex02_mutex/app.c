@@ -115,15 +115,15 @@ void Fast_LED_task( uint32_t arg )
 
 		
         /* Blink LED only while button is pressed */
-        while( 0 == wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 ) )
+        while( BTN_PRESSED == wiced_hal_gpio_get_pin_input_status( USER_BUTTON1 ) )
 		{
-			if( GPIO_PIN_OUTPUT_HIGH == wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) )
+			if( LED_STATE_OFF == wiced_hal_gpio_get_pin_output( LED1 ) )
 			{
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
+				wiced_hal_gpio_set_pin_output( LED1, LED_STATE_ON );
 			}
 			else
 			{
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( LED1, LED_STATE_OFF );
 			}
 
             /* Send the thread to sleep for a period of time */
@@ -150,14 +150,8 @@ void Slow_LED_task( uint32_t arg )
 
 		
         /* Blink LED at a fixed rate */
-    	if( GPIO_PIN_OUTPUT_HIGH == wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) )
-    	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
-    	}
-    	else
-    	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
-    	}
+    	wiced_hal_gpio_set_pin_output(LED1, !wiced_hal_gpio_get_pin_output(LED1) );
+
 
         /* TODO: Unlock Mutex when done with the LED to allow other thread to have access */
 

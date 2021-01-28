@@ -1,5 +1,5 @@
 /*
-* Copyright 2019, Cypress Semiconductor Corporation or a subsidiary of
+* Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
 * Cypress Semiconductor Corporation. All Rights Reserved.
 *
 * This software, including source code, documentation and related
@@ -97,7 +97,6 @@ extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
  ******************************************************/
 #define MESH_PID                0x311F
 #define MESH_VID                0x0002
-#define MESH_FWID               0x311F000101010001
 #define MESH_CACHE_REPLAY_SIZE  0x0008
 
 /******************************************************
@@ -142,11 +141,13 @@ wiced_bt_mesh_core_config_property_t mesh_element1_properties[] =
 };
 #define MESH_APP_NUM_PROPERTIES (sizeof(mesh_element1_properties) / sizeof(wiced_bt_mesh_core_config_property_t))
 
+
 wiced_bt_mesh_core_config_model_t   mesh_element2_models[] =
 {
     WICED_BT_MESH_MODEL_LIGHT_LIGHTNESS_SERVER,
 };
 #define MESH_APP_NUM_MODELS_GREEN  (sizeof(mesh_element2_models) / sizeof(wiced_bt_mesh_core_config_model_t))
+
 
 #define MESH_LIGHT_LIGHTNESS_SERVER_ELEMENT_INDEX   0
 
@@ -164,7 +165,7 @@ wiced_bt_mesh_core_config_element_t mesh_elements[] =
         .properties = mesh_element1_properties,                         // Array of properties in the element.
         .sensors_num = 0,                                               // Number of sensors in the sensor array
         .sensors = NULL,                                                // Array of sensors of that element
-        .models_num = MESH_APP_NUM_MODELS_RED,                              // Number of models in the array models
+        .models_num = MESH_APP_NUM_MODELS_RED,                          // Number of models in the array models
         .models = mesh_element1_models,                                 // Array of models located in that element. Model data is defined by structure wiced_bt_mesh_core_config_model_t
     },
 	{
@@ -181,7 +182,7 @@ wiced_bt_mesh_core_config_element_t mesh_elements[] =
 		.sensors = NULL,                                                // Array of sensors of that element
 		.models_num = MESH_APP_NUM_MODELS_GREEN,                        // Number of models in the array models
 		.models = mesh_element2_models,                                 // Array of models located in that element. Model data is defined by structure wiced_bt_mesh_core_config_model_t
-	},
+		},
 };
 
 wiced_bt_mesh_core_config_t  mesh_config =
@@ -193,7 +194,7 @@ wiced_bt_mesh_core_config_t  mesh_config =
     .features           = WICED_BT_MESH_CORE_FEATURE_BIT_FRIEND | WICED_BT_MESH_CORE_FEATURE_BIT_RELAY | WICED_BT_MESH_CORE_FEATURE_BIT_GATT_PROXY_SERVER,   // In Friend mode support friend, relay
     .friend_cfg         =                                           // Configuration of the Friend Feature(Receive Window in Ms, messages cache)
     {
-        .receive_window        = 200,                               // Receive Window value in milliseconds supported by the Friend node.
+        .receive_window        = 20,                                // Receive Window value in milliseconds supported by the Friend node.
         .cache_buf_len         = 300,                               // Length of the buffer for the cache
         .max_lpn_num           = 4                                  // Max number of Low Power Nodes with established friendship. Must be > 0 if Friend feature is supported.
     },
@@ -225,7 +226,7 @@ wiced_bt_mesh_app_func_table_t wiced_bt_mesh_app_func_table =
     NULL                    // factory reset
 };
 
-uint8_t last_known_brightness[2] = {0};
+uint8_t last_known_brightness[] = {0,0};
 uint8_t attention_brightness = 0;
 uint8_t attention_time = 0;
 
@@ -298,15 +299,20 @@ void mesh_app_fast_power_off_execute(void)
 void mesh_app_init(wiced_bool_t is_provisioned)
 {
 #if 0
-    extern uint8_t wiced_bt_mesh_model_trace_enabled;
-    wiced_bt_mesh_model_trace_enabled = WICED_TRUE;
+    // Set Debug trace level for mesh_models_lib and mesh_provisioner_lib
+    wiced_bt_mesh_models_set_trace_level(WICED_BT_MESH_CORE_TRACE_INFO);
+#endif
+#if 0
+    // Set Debug trace level for all modules but Info level for CORE_AES_CCM module
+    wiced_bt_mesh_core_set_trace_level(WICED_BT_MESH_CORE_TRACE_FID_ALL, WICED_BT_MESH_CORE_TRACE_DEBUG);
+    wiced_bt_mesh_core_set_trace_level(WICED_BT_MESH_CORE_TRACE_FID_CORE_AES_CCM, WICED_BT_MESH_CORE_TRACE_INFO);
 #endif
     // Do factory reset on fifth power on(reset) in the provisioned state.
     // User can do it to request factory reset.
     if (is_provisioned)
         mesh_app_fast_power_off_execute();
 
-    wiced_bt_cfg_settings.device_name = (uint8_t *)"Key Dimmable Light";
+    wiced_bt_cfg_settings.device_name = (uint8_t *)"Dimmable Light";
     wiced_bt_cfg_settings.gatt_cfg.appearance = APPEARANCE_LIGHT_CEILING;
 
     mesh_prop_fw_version[0] = 0x30 + (WICED_SDK_MAJOR_VER / 10);
@@ -384,7 +390,7 @@ void attention_timer_cb(TIMER_PARAM_TYPE arg)
     if (--attention_time == 0)
     {
         wiced_stop_timer(&attention_timer);
-        led_control_set_brighness_level(last_known_brightness[global_element_index], (uint8_t)arg);
+        led_control_set_brighness_level(last_known_brightness[(uint8_t)arg], (uint8_t)arg);
         return;
     }
     attention_brightness = (attention_brightness == 0) ? 100 : 0;

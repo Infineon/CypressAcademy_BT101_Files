@@ -189,8 +189,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 	    	{
 	    		wiced_hal_read_nvram( VSID_HOSTINFO, sizeof(hostinfo), (uint8_t*)&hostinfo, &(p_event_data->encryption_status.result) );
 	    		/* Set CCCD value from the value that was previously saved in the NVRAM */
-	    		app_modus_counter_client_char_config[0] = hostinfo.cccd[0];
-	    		app_modus_counter_client_char_config[1] = hostinfo.cccd[1];
+	    		app_bt101_counter_client_char_config[0] = hostinfo.cccd[0];
+	    		app_bt101_counter_client_char_config[1] = hostinfo.cccd[1];
 	    		WICED_BT_TRACE("\tRestored existing bonded device info from NVRAM %B result: %d \n\r", hostinfo.remote_addr);
 	    	}
 			break;
@@ -325,8 +325,8 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 
 	            /* Reset the CCCD value so that on a reconnect CCCD will be off */
 	            memset( &hostinfo.remote_addr, 0, sizeof( BD_ADDR ) );
-	            app_modus_counter_client_char_config[0] = 0;
-	            app_modus_counter_client_char_config[1] = 0;
+	            app_bt101_counter_client_char_config[0] = 0;
+	            app_bt101_counter_client_char_config[1] = 0;
 
 				/* Restart the advertisements */
 				wiced_bt_start_advertisements( BTM_BLE_ADVERT_UNDIRECTED_HIGH, 0, NULL );
@@ -458,7 +458,7 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
-                	case HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG:
+                	case HDLD_BT101_COUNTER_CLIENT_CHAR_CONFIG:
                 		if ( len != 2 )
                 		{
                 			return WICED_BT_GATT_INVALID_ATTR_LEN;
@@ -489,17 +489,17 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 ********************************************************************************/
 void button_cback( void *data, uint8_t port_pin )
 {
-    app_modus_counter[0]++;
+    app_bt101_counter[0]++;
 
     if( connection_id )
     {
-    	if( app_modus_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
+    	if( app_bt101_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
     	{
     		wiced_bt_gatt_send_notification(
 				connection_id,
-				HDLC_MODUS_COUNTER_VALUE,
-				app_modus_counter_len,
-				app_modus_counter );
+				HDLC_BT101_COUNTER_VALUE,
+				app_bt101_counter_len,
+				app_bt101_counter );
     	}
     }
 

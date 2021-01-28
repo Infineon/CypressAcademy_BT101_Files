@@ -86,12 +86,5 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 ********************************************************************************/
 void timer_cback( uint32_t data )
 {
-	if( GPIO_PIN_OUTPUT_HIGH == wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) )
-	{
-		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
-	}
-	else
-	{
-		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
-	}
+	wiced_hal_gpio_set_pin_output(LED1, !wiced_hal_gpio_get_pin_output(LED1) );
 }

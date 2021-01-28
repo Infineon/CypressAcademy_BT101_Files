@@ -133,7 +133,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
     .gatt_cfg =                                                     /* GATT configuration */
     {
         .appearance                     = APPEARANCE_GENERIC_TAG,                                     /**< GATT appearance (see gatt_appearance_e) */
-        .client_max_links               = 1,   		//WBT101                                                       /**< Client config: maximum number of servers that local client can connect to  */
+        .client_max_links               = 1,                                                          /**< Client config: maximum number of servers that local client can connect to  */
         .server_max_links               = 1,                                                          /**< Server config: maximum number of remote clients connections allowed by the local */
         .max_attr_len                   = 512,                                                       /**< Maximum attribute length; gki_cfg must have a corresponding buffer pool that can hold this length */
         .max_mtu_size                   = 515                                                         /**< Maximum MTU size for GATT connections, should be between 23 and (max_attr_len + 5) */
@@ -182,7 +182,7 @@ const wiced_bt_cfg_settings_t wiced_bt_cfg_settings =
     .max_number_of_buffer_pools         = 4,                                                              /**< Maximum number of buffer pools in p_btm_cfg_buf_pools and by wiced_create_pool */
 
     /* Interval of  random address refreshing */
-    .rpa_refresh_timeout                = WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_CHANGE_TIMEOUT,             /**< Interval of  random address refreshing - secs */
+    .rpa_refresh_timeout                = WICED_BT_CFG_DEFAULT_RANDOM_ADDRESS_NEVER_CHANGE,             /**< Interval of  random address refreshing - secs */
     /* BLE white list size */
     .ble_white_list_size                = 0,                                                               /**< Maximum number of white list devices allowed. Cannot be more than 128 */
                                                           /**< Maximum number of white list devices allowed. Cannot be more than 128 */

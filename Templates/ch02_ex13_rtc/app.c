@@ -85,8 +85,8 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         {
 			/* Turn on the UART for rx and tx */
 		    wiced_hal_puart_init( );
+			wiced_hal_puart_configuration(115200, PARITY_NONE, STOP_BIT_1 );
 		    wiced_hal_puart_flow_off( );
-		    wiced_hal_puart_set_baudrate( 115200 );
 		    wiced_hal_puart_enable_tx( );
 
 		    /* Enable receive and the interrupt */

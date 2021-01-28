@@ -40,8 +40,8 @@
 static wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
 static wiced_bt_gatt_status_t	app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_data );
 
-wiced_bt_gatt_status_t			app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr );
-wiced_bt_gatt_status_t			app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr );
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data );
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data );
 
 void							app_set_advertisement_data( void );
 
@@ -106,15 +106,20 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 		    wiced_hal_puart_enable_rx();
 
 			/* Configure the button to trigger an interrupt when pressed */
+            /* NOTE: This uses a BSP specific platform function rather than the HAL GPIO function. It requires the 
+                     platform button number instead of the GPIO button number. I.e. WICED_PLATFORM_BUTTON_1 instead of 
+                     WICED_GPIO_PIN_BUTTON_1. That is, WICED_PLATFORM_BUTTON_1 is the button number - the first button
+                     is 0, the seconds button is 1, etc. while WICED_GPIO_PIN_BUTTON_1 is the number of the GPIO that
+                     button 1 is connected to. It could be anything depending on the kit hardware connections */
 		    wiced_platform_register_button_callback(WICED_PLATFORM_BUTTON_1, button_cback, 0, GPIO_EN_INT_BOTH_EDGE);
 
 			/* Turn off the LED(s) */
 			#ifdef LED_RED 	// Check if the kit has RGB LED (if LED_RED is defined)
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, GPIO_PIN_OUTPUT_HIGH );
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( LED_RED, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( LED_GREEN, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( LED_BLUE, GPIO_PIN_OUTPUT_HIGH );
 			#else // Just a single LED
-				wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
+				wiced_hal_gpio_set_pin_output( LED1, GPIO_PIN_OUTPUT_HIGH );
 			#endif
         	/* Create the packet and begin advertising */
             app_set_advertisement_data();
@@ -212,11 +217,11 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 			switch( p_attr->request_type )
 			{
 				case GATTS_REQ_TYPE_READ:
-					result = app_gatt_get_value( p_attr );
+					result = app_gatt_get_value( &(p_attr->data.read_req) );
 					break;
 
 				case GATTS_REQ_TYPE_WRITE:
-					result = app_gatt_set_value( p_attr );
+					result = app_gatt_set_value( &(p_attr->data.write_req) );
 					break;
             }
             break;
@@ -240,7 +245,7 @@ void app_set_advertisement_data( void )
 
     uint8_t adv_flag = BTM_BLE_GENERAL_DISCOVERABLE_FLAG | BTM_BLE_BREDR_NOT_SUPPORTED;
 
-    static uint8_t uuid[] = { __UUID_SERVICE_MODUS };
+    static uint8_t uuid[] = { __UUID_SERVICE_BT101 };
 
     /* Advertisement Element for Flags */
     adv_elem[num_elem].advert_type = BTM_BLE_ADVERT_TYPE_FLAG;
@@ -269,65 +274,79 @@ void app_set_advertisement_data( void )
 * Function Name: app_gatt_get_value(
 * 					wiced_bt_gatt_attribute_request_t *p_attr )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_get_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_get_value( wiced_bt_gatt_read_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.read_req.p_val;
-	uint16_t *p_len = 		p_attr->data.read_req.p_val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t *p_len = 		p_data->p_val_len;
+	uint16_t  offset =		p_data->offset;
 
-    int i = 0;
+	int i = 0;
+	int len_to_copy;
+
     wiced_bt_gatt_status_t res = WICED_BT_GATT_INVALID_HANDLE;
 
     // Check for a matching handle entry
     for (i = 0; i < app_gatt_db_ext_attr_tbl_size; i++)
     {
-        if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
+    	// Search for a matching handle in the external lookup table
+    	if (app_gatt_db_ext_attr_tbl[i].handle == attr_handle)
         {
-            // Detected a matching handle in the external lookup table
-            if (app_gatt_db_ext_attr_tbl[i].cur_len <= *p_len)
+            /* Start by assuming we will copy entire value */
+    		len_to_copy = app_gatt_db_ext_attr_tbl[i].cur_len;
+
+    		/* Offset is beyond the end of the actual data length, nothing to do*/
+    		if ( offset >= len_to_copy)
+    		{
+    			return WICED_BT_GATT_INVALID_OFFSET;
+    		}
+
+    		/* Only need to copy from offset to the end */
+    		len_to_copy = len_to_copy - offset;
+
+    		/* Determine if there is enough space to copy the entire value.
+    		 * If not, only copy as much as will fit. */
+            if (len_to_copy > *p_len)
             {
-                // Value fits within the supplied buffer; copy over the value
-                *p_len = app_gatt_db_ext_attr_tbl[i].cur_len;
-                memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data, app_gatt_db_ext_attr_tbl[i].cur_len);
-                res = WICED_BT_GATT_SUCCESS;
-
-                // TODO: Add code for any action required when this attribute is read
-                switch ( attr_handle )
-                {
-					case HDLC_MODUS_LED_VALUE:
-						WICED_BT_TRACE( "Reading LED (%d)\r\n", app_modus_led[0] );
-						break;
-
-					case HDLC_MODUS_COUNTER_VALUE:
-						WICED_BT_TRACE( "Reading Counter (%d)\r\n", app_modus_counter[0] );
-						break;
-
-					case HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG:
-						WICED_BT_TRACE( "Reading Counter CCCD (%d)\r\n", app_modus_counter_client_char_config[0] );
-						break;
-                }
+            	len_to_copy = *p_len;
             }
-            else
+
+			/* Tell the stack how much will be copied to the buffer and then do the copy */
+			*p_len = len_to_copy;
+			memcpy(p_val, app_gatt_db_ext_attr_tbl[i].p_data + offset, len_to_copy);
+			res = WICED_BT_GATT_SUCCESS;
+
+            // TODO: Add code for any action required when this attribute is read
+            switch ( attr_handle )
             {
-                // Value to read will not fit within the buffer
-                res = WICED_BT_GATT_INVALID_ATTR_LEN;
+                case HDLC_BT101_LED_VALUE:
+                    WICED_BT_TRACE( "Reading LED (%d)\r\n", app_bt101_led[0] );
+                    break;
+
+                case HDLC_BT101_COUNTER_VALUE:
+                    WICED_BT_TRACE( "Reading Counter (%d)\r\n", app_bt101_counter[0] );
+                    break;
+
+                case HDLD_BT101_COUNTER_CLIENT_CHAR_CONFIG:
+                    WICED_BT_TRACE( "Reading Counter CCCD (%d)\r\n", app_bt101_counter_client_char_config[0] );
+                    break;
             }
-            break;
-        }
+			break; /* break out of for loop once matching handle is found */
+       }
     }
-
     return res;
 }
 
+
 /*******************************************************************************
 * Function Name: app_gatt_set_value(
-*					wiced_bt_gatt_attribute_request_t *p_attr )
+*					wiced_bt_gatt_write_t *p_data )
 ********************************************************************************/
-wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_attr )
+static wiced_bt_gatt_status_t	app_gatt_set_value( wiced_bt_gatt_write_t *p_data )
 {
-	uint16_t attr_handle = 	p_attr->data.handle;
-	uint8_t  *p_val = 		p_attr->data.write_req.p_val;
-	uint16_t len = 			p_attr->data.write_req.val_len;
+	uint16_t attr_handle = 	p_data->handle;
+	uint8_t  *p_val = 		p_data->p_val;
+	uint16_t len = 			p_data->val_len;
 
     int i = 0;
     wiced_bool_t validLen = WICED_FALSE;
@@ -351,23 +370,23 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
                 // For example you may need to write the value into NVRAM if it needs to be persistent
                 switch ( attr_handle )
                 {
-					case HDLC_MODUS_LED_VALUE:
-						WICED_BT_TRACE( "Writing LED (%d)\r\n", app_modus_led[0] );
+					case HDLC_BT101_LED_VALUE:
+						WICED_BT_TRACE( "Writing LED (%d)\r\n", app_bt101_led[0] );
 						#ifdef LED_RED 	// Check if the kit has RGB LED (if LED_RED is defined)
-							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, !( app_modus_led[0] & 0x01 ) );
-							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_2, !( app_modus_led[0] & 0x02 ) );
-							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_3, !( app_modus_led[0] & 0x04 ) );
+							wiced_hal_gpio_set_pin_output( LED_RED, !( app_bt101_led[0] & 0x01 ) );
+							wiced_hal_gpio_set_pin_output( LED_GREEN, !( app_bt101_led[0] & 0x02 ) );
+							wiced_hal_gpio_set_pin_output( LED_BLUE, !( app_bt101_led[0] & 0x04 ) );
 						#else // Just a single LED
-							wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, !app_modus_led[0] );
+							wiced_hal_gpio_set_pin_output( LED1, !app_bt101_led[0] );
 						#endif
 						break;
 
-					case HDLC_MODUS_COUNTER_VALUE:
-						WICED_BT_TRACE( "Writing Counter (%d)\r\n", app_modus_counter[0] );
+					case HDLC_BT101_COUNTER_VALUE:
+						WICED_BT_TRACE( "Writing Counter (%d)\r\n", app_bt101_counter[0] );
 						break;
 
-					case HDLD_MODUS_COUNTER_CLIENT_CHAR_CONFIG:
-						WICED_BT_TRACE( "Writing Counter CCCD (%d)\r\n", app_modus_counter_client_char_config[0] );
+					case HDLD_BT101_COUNTER_CLIENT_CHAR_CONFIG:
+						WICED_BT_TRACE( "Writing Counter CCCD (%d)\r\n", app_bt101_counter_client_char_config[0] );
 						break;
                 }
             }
@@ -389,21 +408,23 @@ wiced_bt_gatt_status_t app_gatt_set_value( wiced_bt_gatt_attribute_request_t *p_
 ********************************************************************************/
 void button_cback( void *data, uint8_t port_pin )
 {
-	if( wiced_platform_get_button_pressed_value( WICED_PLATFORM_BUTTON_1 ) ==
+    /* NOTE: The first call uses a BSP specific platform function and the second call uses a HAL GPIO
+             function. The first requires the button number while the second requires the pin number. */  
+	if( wiced_platform_get_button_pressed_value(WICED_PLATFORM_BUTTON_1) ==
 			wiced_hal_gpio_get_pin_input_status( WICED_GPIO_PIN_BUTTON_1 ))
 	{
 		/* Button pressed, increment counter and notify */
-		app_modus_counter[0]++;
+		app_bt101_counter[0]++;
 
 		if( connection_id )
 		{
-			if( app_modus_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
+			if( app_bt101_counter_client_char_config[0] & GATT_CLIENT_CONFIG_NOTIFICATION )
 			{
 				wiced_bt_gatt_send_notification(
 						connection_id,
-						HDLC_MODUS_COUNTER_VALUE,
-						app_modus_counter_len,
-						app_modus_counter );
+						HDLC_BT101_COUNTER_VALUE,
+						app_bt101_counter_len,
+						app_bt101_counter );
 			}
 		}
 	}

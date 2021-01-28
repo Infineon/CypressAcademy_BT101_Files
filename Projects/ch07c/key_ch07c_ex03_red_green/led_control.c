@@ -1,5 +1,5 @@
 /*
- * Copyright 2019, Cypress Semiconductor Corporation or a subsidiary of
+ * Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
  * Cypress Semiconductor Corporation. All Rights Reserved.
  *
  * This software, including source code, documentation and related
@@ -37,7 +37,6 @@
  * Led control functionality
  *
  */
-
 #include "sparcommon.h"
 
 #include "wiced_hal_pwm.h"
@@ -63,7 +62,7 @@
 /******************************************************************************
  *                                Variables Definitions
  ******************************************************************************/
-#if ( !defined(CYW20719B1) && !defined(CYW20819A1) && !defined(CYW20735B1) )
+#if ( !defined(CYW20719B1) && !defined(CYW20819A1) && !defined(CYW20735B1) && !defined(CYW20719B2) && !defined(CYW20721B2))
 #define WICED_GPIO_PIN_LED_2 1
 #endif
 wiced_bt_gpio_numbers_t led_pin_r = LED_RED;
@@ -78,28 +77,37 @@ wiced_bt_gpio_numbers_t led_pin_g = LED_GREEN;
  */
 void led_control_init(uint8_t control_type)
 {
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+    wiced_pwm_config_t pwm_config;
+#else
     pwm_config_t pwm_config;
+#endif
 
     if (control_type == LED_CONTROL_TYPE_ONOFF)
         return;
 
     else if (control_type == LED_CONTROL_TYPE_LEVEL)
     {
-    	/* configure PWM */
-    	#ifdef CYW20719B1
-    	    wiced_hal_pwm_configure_pin(led_pin_r, PWM_CHANNELR);
-    	    wiced_hal_pwm_configure_pin(led_pin_g, PWM_CHANNELG);
-    	#endif
+        /* configure PWM */
+#ifdef CYW20719B1
+        wiced_hal_pwm_configure_pin(led_pin_r, PWM_CHANNELR);
+        wiced_hal_pwm_configure_pin(led_pin_g, PWM_CHANNELG);
+#endif
 
-    	#ifdef CYW20819A1
-    	    wiced_hal_gpio_select_function(LED_RED,   WICED_PWM0);
-    	    wiced_hal_gpio_select_function(LED_GREEN, WICED_PWM1);
+#if ( defined(CYW20819A1) || defined(CYW20735B1) || defined(CYW20719B2) || defined(CYW20721B2) )
+        wiced_hal_gpio_select_function(LED_RED, WICED_PWM0);
+        wiced_hal_gpio_select_function(LED_GREEN, WICED_PWM1);
+#endif
 
-    	#endif
-    	    wiced_hal_aclk_enable(PWM_INP_CLK_IN_HZ, ACLK1, ACLK_FREQ_24_MHZ);
-    	    wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, 0, PWM_FREQ_IN_HZ, &pwm_config);
-    	    wiced_hal_pwm_start(PWM_CHANNELR, PMU_CLK, pwm_config.toggle_count, pwm_config.init_count, 1);
-    	    wiced_hal_pwm_start(PWM_CHANNELG, PMU_CLK, pwm_config.toggle_count, pwm_config.init_count, 1);
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+        wiced_hal_aclk_enable(PWM_INP_CLK_IN_HZ, WICED_ACLK1, WICED_ACLK_FREQ_24_MHZ);
+#else
+        wiced_hal_aclk_enable(PWM_INP_CLK_IN_HZ, ACLK1, ACLK_FREQ_24_MHZ);
+#endif
+
+        wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, 0, PWM_FREQ_IN_HZ, &pwm_config);
+        wiced_hal_pwm_start(PWM_CHANNELR, PMU_CLK, pwm_config.toggle_count, pwm_config.init_count, 1);
+        wiced_hal_pwm_start(PWM_CHANNELG, PMU_CLK, pwm_config.toggle_count, pwm_config.init_count, 1);
     }
     else if (control_type == LED_CONTROL_TYPE_COLOR)
     {
@@ -112,7 +120,11 @@ void led_control_init(uint8_t control_type)
  */
 void led_control_set_brighness_level(uint8_t brightness_level, uint8_t element_idx)
 {
+#if (defined(CYW20719B2) || defined(CYW20721B2))
+    wiced_pwm_config_t pwm_config;
+#else
     pwm_config_t pwm_config;
+#endif
 
     WICED_BT_TRACE("set brightness:%d\n", brightness_level);
 
@@ -123,14 +135,14 @@ void led_control_set_brighness_level(uint8_t brightness_level, uint8_t element_i
     wiced_hal_pwm_get_params(PWM_INP_CLK_IN_HZ, brightness_level, PWM_FREQ_IN_HZ, &pwm_config);
 
     switch(element_idx)
-	{
-	case RED:
-		wiced_hal_pwm_change_values(PWM_CHANNELR, pwm_config.toggle_count, pwm_config.init_count);
-		break;
-	case GREEN:
-		wiced_hal_pwm_change_values(PWM_CHANNELG, pwm_config.toggle_count, pwm_config.init_count);
-		break;
-	}
+    {
+		case RED:
+			wiced_hal_pwm_change_values(PWM_CHANNELR, pwm_config.toggle_count, pwm_config.init_count);
+			break;
+		case GREEN:
+			wiced_hal_pwm_change_values(PWM_CHANNELG, pwm_config.toggle_count, pwm_config.init_count);
+			break;
+    }
 }
 
 /*
@@ -142,25 +154,25 @@ void led_control_set_onoff(uint8_t onoff_value, uint8_t element_idx)
 
     switch(element_idx)
     {
-    case RED:
-		if (onoff_value == 1)           // led is on
-		{
-			wiced_hal_gpio_configure_pin(led_pin_r, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
-		}
-		else if (onoff_value == 0)      // led is off
-		{
-			wiced_hal_gpio_configure_pin(led_pin_r, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
-		}
-		break;
-    case GREEN:
-    	if (onoff_value == 1)           // led is on
-		{
-			wiced_hal_gpio_configure_pin(led_pin_g, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
-		}
-		else if (onoff_value == 0)      // led is off
-		{
-			wiced_hal_gpio_configure_pin(led_pin_g, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
-		}
-    	break;
+		case RED:
+			if (onoff_value == 1)           // led is on
+			{
+				wiced_hal_gpio_configure_pin(led_pin_r, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+			}
+			else if (onoff_value == 0)      // led is off
+			{
+				wiced_hal_gpio_configure_pin(led_pin_r, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
+			}
+			break;
+		case GREEN:
+			if (onoff_value == 1)           // led is on
+			{
+				wiced_hal_gpio_configure_pin(led_pin_g, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_LOW);
+			}
+			else if (onoff_value == 0)      // led is off
+			{
+				wiced_hal_gpio_configure_pin(led_pin_g, GPIO_OUTPUT_ENABLE, GPIO_PIN_OUTPUT_HIGH);
+			}
+			break;
     }
 }

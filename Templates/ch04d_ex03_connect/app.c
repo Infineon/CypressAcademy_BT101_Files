@@ -10,8 +10,7 @@
 
 #include "cycfg.h"
 
-#define MAX_ADV_NAME_LEN				(30)
-
+#define MAX_ADV_NAME_LEN				(28) 	/* Maximum possible name length since flags take 3 bytes and max packet is 31. */
 
 /*******************************************************************
  * Function Prototypes
@@ -20,8 +19,7 @@ wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t even
 wiced_bt_gatt_status_t	app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data );
 void					uart_rx_callback( void *data );
 
-void					myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
-
+void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
 
 /*******************************************************************
  * Global/Static Variables
@@ -74,7 +72,7 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 //				wiced_hal_puart_enable_rx();
 			}
 			break;
-			
+
 		case BTM_LOCAL_IDENTITY_KEYS_REQUEST_EVT:
 			break;
 
@@ -105,7 +103,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
 
 /*******************************************************************************
-* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
+* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback( 
+*					wiced_bt_gatt_evt_t event,
+*					wiced_bt_gatt_event_data_t *p_event_data )
 ********************************************************************************/
 wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
 {
@@ -114,9 +114,6 @@ wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt
 	switch( event )
 	{
 		case GATT_CONNECTION_STATUS_EVT:
-			break;
-
-		case GATT_OPERATION_CPLT_EVT:
 			break;
 
 		default:
@@ -158,7 +155,7 @@ void uart_rx_callback( void *data )
 			break;
 
 		default:
-			WICED_BT_TRACE( "Unrecognised command\r\n" );
+			WICED_BT_TRACE( "Unrecognized command\r\n" );
 			// No break - fall through and display help
 
 		case '?':			// Help
@@ -166,7 +163,6 @@ void uart_rx_callback( void *data )
 			WICED_BT_TRACE( "\t%c\tHelp (this message)\r\n", '?' );
 			WICED_BT_TRACE( "\t%c\tStart scanning\r\n", 's' );
 			WICED_BT_TRACE( "\t%c\tStop scanning\r\n", 'S' );
-			WICED_BT_TRACE( "\t%s\tControl LED\r\n", "0..7" );
 			WICED_BT_TRACE( "\r\n" );
 			break;
 	}
@@ -188,19 +184,12 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 
 	p_name = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_NAME_COMPLETE, &len );
 
-	if( p_name && ( len == strlen("key_peri") ) && (memcmp( "key_peri", p_name, len ) == 0) )
+	if( p_name && ( len == strlen(SEARCH_DEVICE_NAME) ) && (memcmp( SEARCH_DEVICE_NAME, p_name, len ) == 0) )
 	{
 		memcpy( dev_name, p_name, len);
 		dev_name[len] = 0x00;	/* Null terminate the string */
 
-		WICED_BT_TRACE("Found Device %s with BD Address: [%B] ", dev_name, p_scan_result->remote_bd_addr );
-
-
-		p_service = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
-		if( p_service && len > 0 )
-		{
-			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
-		}
-
+		WICED_BT_TRACE("Found Device \"%s\" with BD Address: [%B]\r\n", dev_name, p_scan_result->remote_bd_addr );
 	}
 }
+

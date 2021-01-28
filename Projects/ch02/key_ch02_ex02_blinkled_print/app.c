@@ -94,14 +94,14 @@ void app_task( uint32_t arg )
 {
     while( 1 )
     {
-    	if( GPIO_PIN_OUTPUT_HIGH == wiced_hal_gpio_get_pin_output( WICED_GPIO_PIN_LED_1 ) )
+		wiced_hal_gpio_set_pin_output(LED1, !wiced_hal_gpio_get_pin_output(LED1) );
+
+		if( LED_STATE_ON == wiced_hal_gpio_get_pin_output( LED1 ) )
     	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_LOW );
     		WICED_BT_TRACE( "LED ON\r\n" );
     	}
     	else
     	{
-    		wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, GPIO_PIN_OUTPUT_HIGH );
     		WICED_BT_TRACE( "LED OFF\r\n" );
 		}
 		

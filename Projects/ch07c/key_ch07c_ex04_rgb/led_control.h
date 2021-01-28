@@ -1,5 +1,5 @@
 /*
- * Copyright 2019, Cypress Semiconductor Corporation or a subsidiary of
+ * Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
  * Cypress Semiconductor Corporation. All Rights Reserved.
  *
  * This software, including source code, documentation and related
@@ -55,7 +55,7 @@ void led_control_init(uint8_t control_type);
 /*
  * Set LED brightness level 0 to 100%
  */
-void led_control_set_brightness_level(uint16_t hue, uint16_t saturation, uint16_t lightness);
+void led_control_set_brighness_level(uint16_t hue, uint16_t saturation, uint16_t lightness);
 
 /*
  * Turn LED on or off

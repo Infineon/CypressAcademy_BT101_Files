@@ -6,9 +6,8 @@
 #include "wiced_hal_puart.h"
 #include "wiced_bt_stack.h"
 #include "wiced_rtos.h"
-#include "wiced_hal_pwm.h"
 #include "cycfg.h"
-
+#include "wiced_hal_pwm.h"
 
 /* Convenient defines for thread sleep times */
 #define SLEEP_10MS		(10)
@@ -16,6 +15,7 @@
 #define SLEEP_250MS		(250)
 #define SLEEP_1000MS	(1000)
 
+/* PWM parameters */
 #define LHL_CLK_FREQ (32*1000)
 #define PWM_FREQ (500)
 #define PWM_DUTY_INIT (50)
@@ -70,16 +70,18 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
-			/* Configure and start the PWM */
+			/* Initialize peripherals before creating threads */
+        	/* Configure and start the PWM */
         	wiced_hal_pwm_get_params( LHL_CLK_FREQ, PWM_DUTY_INIT, PWM_FREQ, &pwm_config);
-	        wiced_hal_pwm_start( PWM0, LHL_CLK, pwm_config.toggle_count, pwm_config.init_count, 0 );
-
+        	wiced_hal_pwm_start( PWM0, LHL_CLK, pwm_config.toggle_count, pwm_config.init_count, 0 );
+						
+						
 			/* The stack is safely up - create a thread to test out peripherals */
 			wiced_thread_t* peripheral_test_thread = wiced_rtos_create_thread();
 
 			wiced_rtos_init_thread(
 					peripheral_test_thread,		// Thread handle
-					4,                			// Medium Priority
+					4,                			// Medium priority
 					"App Task",					// Name
 					app_task,					// Function
 					1024,						// Stack space for the app_task function to use
@@ -100,20 +102,20 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 ********************************************************************************/
 void app_task( uint32_t arg )
 {
-    uint16_t pwmDuty = PWM_DUTY_INIT;
+   uint16_t pwmDuty = PWM_DUTY_INIT;
 
-    while( 1 )
+   while( 1 )
     {
-		pwmDuty++;					/* Increase duty cycle by 1% (1 count out of 100) */
+    	pwmDuty++;					/* Increase duty cycle by 1% (1 count out of 100) */
 
 		if( pwmDuty == 100 )		/* Reset to 0% duty cycle once we reach 100% */
 		{
 			pwmDuty = 0;
 		}
-    	wiced_hal_pwm_get_params( LHL_CLK_FREQ, pwmDuty, PWM_FREQ, &pwm_config);
+		wiced_hal_pwm_get_params( LHL_CLK_FREQ, pwmDuty, PWM_FREQ, &pwm_config);
 		wiced_hal_pwm_change_values( PWM0, pwm_config.toggle_count, pwm_config.init_count );
 
-		/* Send the thread to sleep for a period of time */
-		wiced_rtos_delay_milliseconds( SLEEP_10MS, ALLOW_THREAD_TO_SLEEP );
-	}
+        /* Send the thread to sleep for a specified number of milliseconds */
+        wiced_rtos_delay_milliseconds( SLEEP_10MS, ALLOW_THREAD_TO_SLEEP );
+    }
 }

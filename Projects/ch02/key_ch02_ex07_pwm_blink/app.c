@@ -6,9 +6,10 @@
 #include "wiced_hal_puart.h"
 #include "wiced_bt_stack.h"
 #include "wiced_rtos.h"
+#include "cycfg.h"
 #include "wiced_hal_pwm.h"
 #include "wiced_hal_aclk.h"
-#include "cycfg.h"
+
 
 /* Convenient defines for thread sleep times */
 #define SLEEP_10MS		(10)
@@ -70,6 +71,7 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
         if( WICED_BT_SUCCESS == p_event_data->enabled.status )
         {
+			/* Initialize peripherals before creating threads */
 			/* Configure and start the PWM */
         	wiced_hal_aclk_enable(CLK_FREQ, ACLK1, ACLK_FREQ_24_MHZ );
         	wiced_hal_pwm_get_params( CLK_FREQ, PWM_DUTY, PWM_FREQ, &pwm_config);
@@ -80,7 +82,7 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
 			wiced_rtos_init_thread(
 					peripheral_test_thread,		// Thread handle
-					4,                			// Medium Priority
+					4,                			// Medium priority
 					"App Task",					// Name
 					app_task,					// Function
 					1024,						// Stack space for the app_task function to use
@@ -104,7 +106,8 @@ void app_task( uint32_t arg )
     while( 1 )
     {
 
-		/* Send the thread to sleep for a period of time */
-		wiced_rtos_delay_milliseconds( SLEEP_250MS, ALLOW_THREAD_TO_SLEEP );
-	}
+
+        /* Send the thread to sleep for a specified number of milliseconds */
+        wiced_rtos_delay_milliseconds( SLEEP_250MS, ALLOW_THREAD_TO_SLEEP );
+    }
 }

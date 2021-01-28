@@ -121,7 +121,7 @@ void app_set_advertisement_data( void )
 		EDDYSTONE_FRAME_TYPE_URL,
 		TX_PWR,
 		EDDYSTONE_URL_SCHEME_0,
-		'c', 'y', 'p', 'r', 'e', 's', 's',
+		'i', 'n', 'f', 'i', 'n', 'e', 'o', 'n',
         DOT_COM
     };
 

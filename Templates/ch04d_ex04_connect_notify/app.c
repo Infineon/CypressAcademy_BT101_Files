@@ -11,8 +11,9 @@
 
 #include "cycfg.h"
 
-#define MAX_ADV_NAME_LEN				(30)
+#define MAX_ADV_NAME_LEN				(28) 	/* Maximum possible name length since flags take 3 bytes and max packet is 31. */
 
+#define SEARCH_DEVICE_NAME "key_peri"			/* Name of device to search for */
 
 /*******************************************************************
  * Function Prototypes
@@ -21,10 +22,9 @@ wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t even
 wiced_bt_gatt_status_t	app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data );
 void					uart_rx_callback( void *data );
 
-void					myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
+void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
 
 void writeLED( uint8_t val );
-
 
 /*******************************************************************
  * Global/Static Variables
@@ -72,7 +72,6 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
 				wiced_bt_gatt_register(app_bt_gatt_callback);
 
-
 				/* PUART receive not used in first two exercises */
 				wiced_hal_puart_register_interrupt( uart_rx_callback );	// Enable receive interrupts on the PUART
 				wiced_hal_puart_set_watermark_level( 1 );				// Interrupt up on each byte received
@@ -114,7 +113,9 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 
 
 /*******************************************************************************
-* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
+* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback(
+*					wiced_bt_gatt_evt_t event,
+*					wiced_bt_gatt_event_data_t *p_event_data )
 ********************************************************************************/
 wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
 {
@@ -134,9 +135,6 @@ wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt
 				WICED_BT_TRACE( "Disconnected from: %d\n", connection_id);
 				connection_id = 0;
 			}
-			break;
-
-		case GATT_OPERATION_CPLT_EVT:
 			break;
 
 		default:
@@ -169,7 +167,7 @@ void uart_rx_callback( void *data )
 			wiced_bt_ble_scan( BTM_BLE_SCAN_TYPE_NONE, WICED_TRUE, myScanCallback );
 			break;
 
-		case 'd':
+		case 'd':			// Disconnect
 			wiced_bt_gatt_disconnect(connection_id);
 			break;
 
@@ -185,7 +183,7 @@ void uart_rx_callback( void *data )
 			break;
 
 		default:
-			WICED_BT_TRACE( "Unrecognised command\r\n" );
+			WICED_BT_TRACE( "Unrecognized command\r\n" );
 			// No break - fall through and display help
 
 		case '?':			// Help
@@ -216,25 +214,16 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 
 	p_name = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_NAME_COMPLETE, &len );
 
-	if( p_name && ( len == strlen("key_peri") ) && (memcmp( "key_peri", p_name, len ) == 0) )
+	if( p_name && ( len == strlen(SEARCH_DEVICE_NAME) ) && (memcmp( SEARCH_DEVICE_NAME, p_name, len ) == 0) )
 	{
 		memcpy( dev_name, p_name, len);
 		dev_name[len] = 0x00;	/* Null terminate the string */
 
-		WICED_BT_TRACE("Found Device %s with BD Address: [%B] ", dev_name, p_scan_result->remote_bd_addr );
-
-
-		p_service = wiced_bt_ble_check_advertising_data( p_adv_data, BTM_BLE_ADVERT_TYPE_128SRV_COMPLETE, &len );
-		if( p_service && len > 0 )
-		{
-			WICED_BT_TRACE_ARRAY( (uint8_t*)p_service, len, "Service: ");
-		}
+		WICED_BT_TRACE("Found Device \"%s\" with BD Address: [%B]\r\n", dev_name, p_scan_result->remote_bd_addr );
 
 		/* Connect and turn off scanning */
 		wiced_bt_gatt_le_connect(p_scan_result->remote_bd_addr, p_scan_result->ble_addr_type, BLE_CONN_MODE_HIGH_DUTY, WICED_TRUE);
 		wiced_bt_ble_scan( BTM_BLE_SCAN_TYPE_NONE, WICED_TRUE, myScanCallback );
-
-
 	}
 }
 

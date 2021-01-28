@@ -102,7 +102,7 @@ void app_task( uint32_t arg )
     {
         WICED_BT_TRACE("**** Loop Start **** \n\r");
         
-        wiced_hal_gpio_set_pin_output( WICED_GPIO_PIN_LED_1, led );
+        wiced_hal_gpio_set_pin_output( LED1, led );
 
         /* Send the thread to sleep for a specified number of milliseconds */
         wiced_rtos_delay_milliseconds( SLEEP_250MS, ALLOW_THREAD_TO_SLEEP );

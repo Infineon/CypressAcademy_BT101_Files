@@ -18,8 +18,7 @@ wiced_bt_dev_status_t	app_bt_management_callback( wiced_bt_management_evt_t even
 wiced_bt_gatt_status_t	app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data );
 void					uart_rx_callback( void *data );
 
-void					myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
-
+void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_data );
 
 /*******************************************************************
  * Global/Static Variables
@@ -101,6 +100,12 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
 	return status;
 }
 
+
+/*******************************************************************************
+* Function Name: wiced_bt_gatt_status_t app_bt_gatt_callback( 
+*					wiced_bt_gatt_evt_t event,
+*					wiced_bt_gatt_event_data_t *p_event_data )
+********************************************************************************/
 wiced_bt_gatt_status_t app_bt_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_event_data )
 {
 	wiced_result_t status = WICED_BT_SUCCESS;
@@ -149,7 +154,7 @@ void uart_rx_callback( void *data )
 			break;
 
 		default:
-			WICED_BT_TRACE( "Unrecognised command\r\n" );
+			WICED_BT_TRACE( "Unrecognized command\r\n" );
 			// No break - fall through and display help
 
 		case '?':			// Help
@@ -172,3 +177,4 @@ void myScanCallback( wiced_bt_ble_scan_results_t *p_scan_result, uint8_t *p_adv_
 {
     WICED_BT_TRACE( "Host = %B\r\n", p_scan_result->remote_bd_addr );
 }
+
