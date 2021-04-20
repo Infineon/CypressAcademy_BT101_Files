@@ -16,7 +16,7 @@
 #define SLEEP_1000MS	(1000)
 
 /* PWM parameters */
-#define LHL_CLK_FREQ (32*1000)
+#define CLK_FREQ (32*1000)
 #define PWM_FREQ (500)
 #define PWM_DUTY_INIT (50)
 
@@ -72,7 +72,7 @@ wiced_result_t app_bt_management_callback( wiced_bt_management_evt_t event, wice
         {
 			/* Initialize peripherals before creating threads */
         	/* Configure and start the PWM */
-        	wiced_hal_pwm_get_params( LHL_CLK_FREQ, PWM_DUTY_INIT, PWM_FREQ, &pwm_config);
+        	wiced_hal_pwm_get_params( CLK_FREQ, PWM_DUTY_INIT, PWM_FREQ, &pwm_config);
         	wiced_hal_pwm_start( PWM0, LHL_CLK, pwm_config.toggle_count, pwm_config.init_count, 0 );
 						
 						
@@ -112,7 +112,7 @@ void app_task( uint32_t arg )
 		{
 			pwmDuty = 0;
 		}
-		wiced_hal_pwm_get_params( LHL_CLK_FREQ, pwmDuty, PWM_FREQ, &pwm_config);
+		wiced_hal_pwm_get_params( CLK_FREQ, pwmDuty, PWM_FREQ, &pwm_config);
 		wiced_hal_pwm_change_values( PWM0, pwm_config.toggle_count, pwm_config.init_count );
 
         /* Send the thread to sleep for a specified number of milliseconds */

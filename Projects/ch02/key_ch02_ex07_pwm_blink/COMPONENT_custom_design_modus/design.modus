@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Design version="12" xmlns="http://cypress.com/xsd/cydesignfile_v3">
-    <ToolInfo version="2.2.0.2801"/>
+    <ToolInfo version="2.3.0.4276"/>
     <Devices>
         <Device mpn="CYW20819A1KFBG">
             <BlockConfig>
@@ -134,7 +134,7 @@
                 <Block location="ioss[0].pin[26]">
                     <Alias value="LED2"/>
                     <Personality template="20x19_pin" version="1.0">
-                        <Param id="Type" value="LED"/>
+                        <Param id="Type" value="PERIPHERAL"/>
                         <Param id="Index" value="2"/>
                         <Param id="DefaultState" value="GPIO_PIN_OUTPUT_HIGH"/>
                         <Param id="Control" value="GPIO_OUTPUT_ENABLE"/>
@@ -146,7 +146,7 @@
                 <Block location="ioss[0].pin[27]">
                     <Alias value="LED1"/>
                     <Personality template="20x19_pin" version="1.0">
-                        <Param id="Type" value="PERIPHERAL"/>
+                        <Param id="Type" value="LED"/>
                         <Param id="Index" value="1"/>
                         <Param id="DefaultState" value="GPIO_PIN_OUTPUT_HIGH"/>
                         <Param id="Control" value="GPIO_OUTPUT_ENABLE"/>
@@ -292,7 +292,7 @@
                         <Param id="InterruptTrigger" value="GPIO_EN_INT_RISING_EDGE"/>
                     </Personality>
                 </Block>
-                <Block location="pwm[1]">
+                <Block location="pwm[0]">
                     <Personality template="20x19_pwm" version="1.0"/>
                 </Block>
                 <Block location="spi[1]">
@@ -332,8 +332,8 @@
                     <Port name="spi[1].miso[0]"/>
                 </Net>
                 <Net>
-                    <Port name="ioss[0].pin[27].aux[0]"/>
-                    <Port name="pwm[1].pwm[0]"/>
+                    <Port name="ioss[0].pin[26].aux[0]"/>
+                    <Port name="pwm[0].pwm[0]"/>
                 </Net>
                 <Net>
                     <Port name="ioss[0].pin[32].aux[0]"/>
